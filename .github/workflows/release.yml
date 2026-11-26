@@ -4,8 +4,8 @@
 # Release: on a tag v* (git tag v0.7.1 && git push origin v0.7.1), or by hand
 # from the Actions tab with a tag name. Builds every package and attaches it
 # to a DRAFT release: nothing is published until you press "Publish".
-#   server:  deb / rpm / tar, amd64 and arm64 (Debian 11 container: glibc 2.31,
-#            so the binaries run on RHEL/Alma 9 and Debian 11+)
+#   server:  deb / rpm / tar, amd64 and arm64, built natively in AlmaLinux 9
+#            (glibc 2.34: the binaries run on RHEL/Alma 9, Debian 12+, Ubuntu 22.04+)
 #   GUI:     Linux deb / rpm / tar, Windows setup + zip (amd64, arm64), macOS dmg
 #   sources: tar.gz of the tag
 # The release notes come from docs/release-notes/<tag>.md when it exists.
@@ -25,19 +25,21 @@ permissions:
   contents: read
 
 jobs:
-  linux:
-    name: server + GUI Linux/Windows
-    runs-on: ubuntu-latest
-    container: debian:11
+  server:
+    name: server ${{ matrix.arch }}
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    # AlmaLinux 9: glibc 2.34, so the binaries run on RHEL/Alma 9, Debian 12+, Ubuntu 22.04+
+    container: almalinux:9
     steps:
       - name: build tools
-        run: |
-          apt-get update -qq
-          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
-            ca-certificates git curl tar gzip xz-utils python3 binutils file nsis \
-            gcc libc6-dev gcc-aarch64-linux-gnu libc6-dev-arm64-cross pkg-config \
-            libwayland-dev libxkbcommon-dev libx11-xcb-dev libxkbcommon-x11-dev libx11-dev \
-            libxcursor-dev libxfixes-dev libegl1-mesa-dev libvulkan-dev
+        run: dnf install -y -q gcc glibc-devel git tar gzip binutils file python3 findutils
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
@@ -50,19 +52,65 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           go vet ./... && (cd tui && go vet .)
       - name: server packages
-        run: PATH="$PATH:$(go env GOPATH)/bin" ./build-server.sh
-      - name: GUI packages (Linux, Windows)
-        run: PATH="$PATH:$(go env GOPATH)/bin" ./build-gui.sh linux windows
+        run: PATH="$PATH:$(go env GOPATH)/bin" ./build-server.sh ${{ matrix.arch }}
       - uses: actions/upload-artifact@v4
         with:
-          name: linux
+          name: server-${{ matrix.arch }}
           path: |
             dist-server/*.deb
             dist-server/*.rpm
             dist-server/*.tar.gz
+          if-no-files-found: error
+
+  gui-linux:
+    name: GUI Linux amd64
+    runs-on: ubuntu-latest
+    container: almalinux:9
+    steps:
+      - name: build tools
+        run: |
+          dnf install -y -q dnf-plugins-core
+          dnf config-manager --set-enabled crb
+          dnf install -y -q gcc glibc-devel git tar gzip binutils file python3 findutils pkgconf-pkg-config \
+            wayland-devel libxkbcommon-devel libxkbcommon-x11-devel libX11-devel libXcursor-devel \
+            libXfixes-devel mesa-libEGL-devel vulkan-loader-devel vulkan-headers
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: nfpm
+        run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.41.1
+      - name: GUI packages (Linux)
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          PATH="$PATH:$(go env GOPATH)/bin" ./build-gui.sh linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gui-linux
+          path: |
             dist-gui/*.deb
             dist-gui/*.rpm
             dist-gui/*.tar.gz
+          if-no-files-found: error
+
+  gui-windows:
+    name: GUI Windows
+    runs-on: ubuntu-latest
+    steps:
+      - name: build tools
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq nsis
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: GUI packages (Windows)
+        run: ./build-gui.sh windows
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gui-windows
+          path: |
             dist-gui/*.zip
             dist-gui/*.exe
           if-no-files-found: error
@@ -73,7 +121,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-latest
             arch: arm64
           - os: macos-15-intel
             arch: amd64
@@ -96,8 +144,9 @@ jobs:
 
   release:
     name: draft release
-    needs: [linux, macos]
-    if: ${{ !cancelled() && needs.linux.result == 'success' }}
+    needs: [server, gui-linux, gui-windows, macos]
+    # a macOS runner that is missing or fails does not stop the rest
+    if: ${{ !cancelled() && needs.server.result == 'success' && needs.gui-linux.result == 'success' && needs.gui-windows.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
