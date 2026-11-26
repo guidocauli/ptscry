@@ -1,0 +1,17 @@
+# ptscry - Guido Cauli <guido.cauli@gmail.com>
+# /etc/logrotate.d/ptscry
+# Il monitor riapre il file con SIGHUP e continua la catena di hash attraverso la rotazione:
+#   ptscry audit-verify /var/log/ptscry/audit.log.N ... /var/log/ptscry/audit.log
+# Non usare copytruncate (spezzerebbe la catena).
+/var/log/ptscry/audit.log {
+    weekly
+    rotate 104
+    missingok
+    notifempty
+    compress
+    delaycompress
+    create 0600 root root
+    postrotate
+        /bin/systemctl kill -s HUP ptscry-monitor.service >/dev/null 2>&1 || true
+    endscript
+}

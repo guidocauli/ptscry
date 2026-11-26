@@ -1,0 +1,21 @@
+<!-- ptscry - Guido Cauli <guido.cauli@gmail.com> -->
+<!-- Da aggiungere a /var/ossec/etc/ossec.conf dell'AGENT sul server con ptscry
+     (o nella configurazione centralizzata di gruppo, agent.conf, sul manager).
+     L'agent gira come root: puo' leggere l'audit (root 0600). Dopo la modifica:
+       systemctl restart wazuh-agent -->
+<ossec_config>
+
+  <!-- 1. L'audit di ptscry: una riga JSON per evento, decodificata dal decoder JSON di Wazuh -->
+  <localfile>
+    <log_format>json</log_format>
+    <location>/var/log/ptscry/audit.log</location>
+  </localfile>
+
+  <!-- 2. Integrita' dei file che definiscono la sicurezza (ISO A.8.9): binario, config,
+          unit systemd e snippet di sshd. Un cambiamento fuori da una modifica pianificata
+          e' un incidente da indagare. -->
+  <syscheck>
+    <directories check_all="yes" realtime="yes" report_changes="no">/etc/ptscry,/usr/local/bin/ptscry,/etc/systemd/system/ptscry-monitor.service,/etc/ssh/sshd_config.d</directories>
+  </syscheck>
+
+</ossec_config>

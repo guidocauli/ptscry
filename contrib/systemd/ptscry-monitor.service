@@ -1,0 +1,38 @@
+# ptscry - Guido Cauli <guido.cauli@gmail.com>
+# /etc/systemd/system/ptscry-monitor.service
+#
+# ATTENZIONE: qui NON si usano le direttive di sandboxing (ProtectSystem, ProtectHome,
+# PrivateTmp, NoNewPrivileges, CapabilityBoundingSet, RestrictSUIDSGID, SystemCallFilter...).
+# Gli host e le shell degli utenti sono processi figli del monitor e le ereditano:
+# l'utente non vedrebbe /home, non potrebbe usare sudo/su e perderebbe le capability
+# anche con sudo. Il monitor si protegge da solo: parte non-dumpable (niente ptrace
+# ne' core dump), non ha listener di rete (il front-end SSH opzionale e' un processo separato e non privilegiato), accetta solo un frame JSON limitato da
+# client locali e rifiuta binario/config scrivibili da altri.
+
+[Unit]
+Description=ptscry monitor (persistent audited PTY sessions)
+Documentation=file:///usr/local/share/doc/ptscry/README.md
+After=local-fs.target nss-user-lookup.target sssd.service time-sync.target
+Wants=time-sync.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/ptscry monitor -c /etc/ptscry/ptscry.conf
+ExecReload=/bin/kill -HUP $MAINPID
+# Nuova versione senza chiudere le sessioni: "ptscry admin reexec" (o: systemctl kill -s USR2 ptscry-monitor).
+# "restart" e "stop" invece le terminano, come sempre.
+Restart=on-failure
+RestartSec=2
+# Fermare o riavviare il monitor termina anche gli host e le sessioni (fail closed):
+# nessuna sessione resta viva senza audit.
+KillMode=control-group
+TimeoutStopSec=30
+UMask=0077
+RuntimeDirectory=ptscry
+RuntimeDirectoryMode=0755
+# Le shell degli utenti vivono nel cgroup di questo servizio: niente limite artificiale
+# sul numero di processi (i limiti per utente vanno messi in config e con pam_limits).
+TasksMax=infinity
+
+[Install]
+WantedBy=multi-user.target

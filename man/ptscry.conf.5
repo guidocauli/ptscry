@@ -1,0 +1,166 @@
+.\" ptscry - Guido Cauli <guido.cauli@gmail.com>
+.TH PTSCRY.CONF 5 "26 novembre 2026" "ptscry 0.7.0" "Formati dei file"
+.SH NOME
+ptscry.conf \- Guido Cauli <guido.cauli@gmail.com> \- configurazione di ptscry
+.SH DESCRIZIONE
+\fI/etc/ptscry/ptscry.conf\fR e' un file in stile INI. Il monitor lo rifiuta se non e'
+di root o se lui, o una directory sopra di esso, e' scrivibile da altri.
+.PP
+Le sezioni sono \fB[global]\fR, \fB[group:\fINOME\fB]\fR e \fB[user:\fINOME\fB]\fR e si
+applicano in questo ordine: global, poi i gruppi dell'utente, poi l'utente (l'ultimo vince).
+Le righe vuote e quelle che iniziano con \fB#\fR o \fB;\fR sono ignorate; anche un commento a fine riga
+(\fB#\fR preceduto da uno spazio, fuori dalle virgolette) e' ignorato. Una chiave
+sconosciuta, un valore non valido o una chiave \fIglobale\fR dentro una sezione di gruppo o
+utente e' un \fBerrore\fR: un refuso non deve indebolire in silenzio la sicurezza.
+Dopo una modifica: \fBsystemctl reload ptscry\-monitor\fR (SIGHUP). Una configurazione errata
+e' rifiutata e resta quella precedente.
+.SH CHIAVI PER UTENTE O GRUPPO
+.TP
+.B enabled = yes|no
+\fBno\fR: l'account non puo' usare ptscry; le sessioni in corso sono terminate al
+reload successivo.
+.TP
+.B session_lifecycle = exit_on_last_shell|persistent_per_user
+\fBexit_on_last_shell\fR (default): l'host dell'utente termina con l'ultima sessione.
+\fBpersistent_per_user\fR: l'host resta attivo finche' non viene fermato.
+.TP
+.B max_sessions = \fIN\fB|unlimited\fR
+sessioni contemporanee per utente (1..100000). Default 16.
+.TP
+.B job_retention = \fIdurata\fB
+per quanto tempo l'host conserva il risultato di un job avviato con \fBrun \-d\fR
+(default 1h, \fB0\fR = non conservare, massimo 7d).
+.TP
+.B rate_limit = \fIN\fB
+richieste al monitor al secondo per utente (1..1000, default 10, burst 4N). Alzarlo per i
+controllori che avviano molti job (\fBRateLimit\fR).
+.TP
+.B detach_prefix = ctrl\-b
+tasto che introduce i comandi dentro una sessione (default Ctrl\-B; \fBd\fR stacca). Vale per le sessioni dal
+front-end SSH e per i client senza \fBclient.conf\fR. Solo tasti di controllo; Ctrl\-C, D, Z, Invio, Tab,
+Backspace, Esc sono rifiutati.
+.TP
+.B MaxParallelSessions
+sinonimo di \fBmax_sessions\fR. Le chiavi possono essere scritte in CamelCase.
+.TP
+.B Match User \fIa,b\fB | Match Group \fIg\fB | Match All
+apre un blocco di righe \fIChiave valore\fR valido per quegli utenti/gruppi
+(equivalente a \fB[user:x]\fR / \fB[group:g]\fR; le due sintassi si possono mescolare).
+.TP
+.B idle_timeout = \fIdurata\fB
+le sessioni \fIstaccate\fR e inattive da piu' di questo tempo sono terminate
+(\fB30m\fR, \fB12h\fR, \fB7d\fR; \fB0\fR = mai).
+.TP
+.B max_lifetime = \fIdurata\fB
+eta' massima di una sessione, anche se attiva (\fB0\fR = nessun limite).
+.TP
+.B replay_bytes = \fIN\fB
+byte di output tenuti per il replay al ricollegamento (0..524288, default 262144).
+.TP
+.B shell = \fI/percorso\fB
+shell da usare. Se omesso: la shell di login dell'utente (\fBnologin\fR e simili = nessun accesso).
+.TP
+.B allow_command = yes|no
+consente \fBptscry new \fIcomando\fB\fR; con \fBno\fR solo la shell.
+.TP
+.B record = off|output|all
+\fBoutput\fR registra cio' che appare sul terminale; \fBall\fR registra anche la tastiera
+(\fIpuo' catturare password\fR). Se la registrazione e' attiva e non si puo' aprire, la sessione
+non parte.
+.TP
+.B record_max_bytes = \fIdimensione\fB
+massimo per la registrazione di una sessione (byte, o suffisso \fBK\fR, \fBM\fR, \fBG\fR;
+\fB0\fR/\fBunlimited\fR = nessun limite; default \fB512M\fR). Raggiunto, la sessione e'
+terminata. La registrazione si ferma anche con meno di 64 MiB liberi.
+.SH CHIAVI SOLO IN [global]
+.TP
+.B access_group = \fIgruppo\fB
+solo i membri possono usare ptscry. Vuoto = tutti (sconsigliato).
+.TP
+.B allow_root = yes\fR|\fBno
+root puo' usare ptscry sul server anche se non e' in \fBaccess_group\fR (default \fByes\fR; l'audit registra
+comunque il loginuid, cioe' chi ha fatto login prima di sudo). \fBno\fR: anche root deve essere nel gruppo.
+Non vale per il front-end SSH, dove anche root deve essere nel gruppo.
+.TP
+.B admin_group = \fIgruppo\fB
+chi puo' usare \fBptscry admin\fR. Root puo' sempre.
+.TP
+.B max_total_sessions = \fIN\fB|unlimited\fR
+tetto alle sessioni di tutti gli utenti insieme (default 1024). Gli pseudoterminali
+sono una risorsa di sistema (\fBkernel.pty.max\fR).
+.TP
+.B pam_service = \fInome\fB|off\fR
+servizio PAM (\fI/etc/pam.d/nome\fR, default \fBptscry\fR) usato dal launcher root che avvia ogni
+shell: account, credenziali e sessione (\fBpam_loginuid\fR, \fBpam_limits\fR, HBAC FreeIPA).
+\fBoff\fR = la shell e' avviata direttamente dall'host, senza PAM. Richiede un binario con cgo.
+.SS Front-end SSH (opzionale, solo [global])
+.TP
+.B frontend = yes|no
+avvia il front-end SSH: un processo non privilegiato che ascolta su TCP (vedi \fBMANUALE.md\fR 3.5).
+.TP
+.B frontend_listen = \fIhost:porta\fB
+indirizzo di ascolto (default \fB:2222\fR; le porte sotto 1024 non sono possibili).
+.TP
+.B frontend_user = \fIaccount\fB
+account di servizio dedicato (default \fBptscry\-fe\fR): niente shell di login, fuori da access_group e admin_group.
+.TP
+.B frontend_host_key, frontend_ca_keys, frontend_authorized_keys_dir, frontend_totp_dir
+percorsi (root, non scrivibili da altri). \fBnone\fR disattiva certificati o chiavi semplici.
+.TP
+.B frontend_require_fido2 = yes|no
+solo chiavi \fBsk\-ssh\-ed25519\fR con presenza e verifica utente (default yes).
+.TP
+.B frontend_totp = yes|no
+secondo fattore TOTP verificato dal monitor (default yes). Segreto: \fBptscry totp\-init\fR.
+.TP
+.B frontend_cert_max_age = \fIdurata\fB
+validita' massima di un certificato accettato (default 24h).
+.TP
+.B frontend_max_conns = \fIN\fB, frontend_rate = \fIN\fB
+connessioni contemporanee (256) e nuove connessioni al minuto per indirizzo (30, raffica 10).
+.TP
+.B frontend_seccomp = yes|no
+filtro seccomp-bpf nel front-end (default yes, solo Linux x86-64): niente exec, ptrace, mount,
+namespace, scritture su file. Il processo viene terminato se prova un'operazione vietata.
+.SS Altro
+.TP
+.B monitor_socket = \fI/percorso\fB
+socket del monitor (default \fI/run/ptscry/monitor.sock\fR). La directory deve essere di
+root e non scrivibile da altri.
+.TP
+.B audit_log = \fI/percorso\fB
+file di audit (default \fI/var/log/ptscry/audit.log\fR). \fBoff\fR e' rifiutato dal monitor.
+.TP
+.B audit_group = \fIgruppo\fB
+il gruppo che puo' \fIleggere\fR l'audit: file e directory diventano \fBroot:gruppo\fR 0640/0750 (anche dopo
+logrotate e reload), cosi' gli amministratori usano \fBaudit\-verify\fR senza root. Non scrive nulla. Non usare
+\fBaccess_group\fR (\fBcheck\fR lo segnala CRIT). Se il gruppo non esiste il log resta solo di root. Default: solo root.
+.TP
+.B audit_syslog = yes|no
+copia ogni record su syslog (facility \fBauthpriv\fR, programma \fBptscry\fR).
+.TP
+.B record_dir = \fI/percorso\fB
+directory delle registrazioni (default \fI/var/log/ptscry/rec\fR).
+.TP
+.B socket_dir = \fI/percorso\fB
+solo modalita' standalone (\fB%u\fR = uid).
+.SH ESEMPIO
+.nf
+[global]
+access_group = ptscry
+admin_group  = ptscry-admins
+audit_syslog = yes
+max_sessions = 8
+idle_timeout = 7d
+
+[group:sysadmins]
+max_sessions = unlimited
+session_lifecycle = persistent_per_user
+record = output
+
+[user:svc-deploy]
+allow_command = no
+max_lifetime = 8h
+.fi
+.SH VEDERE ANCHE
+.BR ptscry (1)

@@ -1,0 +1,165 @@
+<!-- ptscry - Guido Cauli <guido.cauli@gmail.com> -->
+<!-- Regole Wazuh per l'audit di ptscry.
+     Installazione sul MANAGER:
+       cp ptscry_rules.xml /var/ossec/etc/rules/ && chown wazuh:wazuh /var/ossec/etc/rules/ptscry_rules.xml
+       /var/ossec/bin/wazuh-analysisd -t        # controlla la sintassi
+       systemctl restart wazuh-manager
+     Gli ID 100100-100129 sono nel range riservato alle regole locali (>= 100000): verifica
+     che non siano gia' usati. Livelli: 3 informativo, 6-8 da rivedere, 10+ allarme, 12+ grave.
+     Se ricevi l'audit via syslog (rsyslog -> manager) e non dall'agent, usa anche
+     ptscry_decoders.xml e sostituisci in 100100 <decoded_as>json</decoded_as> con
+     <decoded_as>ptscry</decoded_as>. -->
+<group name="ptscry,">
+
+  <!-- Base: ogni record dell'audit (ha sempre seq e prev) -->
+  <rule id="100100" level="0">
+    <decoded_as>json</decoded_as>
+    <field name="seq">\.+</field>
+    <field name="prev">\.+</field>
+    <description>ptscry: audit record</description>
+  </rule>
+
+  <!-- Accessi -->
+  <rule id="100101" level="8">
+    <if_sid>100100</if_sid>
+    <field name="event">^access_denied$</field>
+    <description>ptscry: access denied for $(user) ($(reason))</description>
+    <group>authentication_failed,</group>
+  </rule>
+
+  <rule id="100102" level="10" frequency="5" timeframe="120">
+    <if_matched_sid>100101</if_matched_sid>
+    <same_field>user</same_field>
+    <description>ptscry: repeated access denials for $(user)</description>
+    <group>authentication_failures,</group>
+  </rule>
+
+  <!-- Richieste che non vengono da sshd (console, accesso locale, scorciatoie): da rivedere.
+       Rumoroso se root usa spesso ptscry in locale: alza o abbassa il livello. -->
+  <rule id="100103" level="4">
+    <if_sid>100100</if_sid>
+    <field name="event">^request$</field>
+    <field name="via_sshd">^false$</field>
+    <description>ptscry: request from uid $(peer_uid) not coming through sshd</description>
+  </rule>
+
+  <!-- Abuso e capacita' -->
+  <rule id="100104" level="8">
+    <if_sid>100100</if_sid>
+    <field name="event">^rate_limited$</field>
+    <description>ptscry: rate limit hit by uid $(uid) ($(refused) requests refused)</description>
+  </rule>
+
+  <rule id="100105" level="6">
+    <if_sid>100100</if_sid>
+    <field name="event">^limit_reached$</field>
+    <description>ptscry: session limit reached by $(user)</description>
+  </rule>
+
+  <rule id="100106" level="10">
+    <if_sid>100100</if_sid>
+    <field name="event">^host_flood$|^host_event_unknown$|^host_event_invalid$</field>
+    <description>ptscry: anomalous behaviour of the host of $(user)</description>
+  </rule>
+
+  <!-- Azioni sull'accesso altrui -->
+  <rule id="100107" level="8">
+    <if_sid>100100</if_sid>
+    <field name="event">^admin_kill$|^admin_stop$</field>
+    <description>ptscry: administrator $(admin) acted on user $(target_user)</description>
+  </rule>
+
+  <rule id="100108" level="8">
+    <if_sid>100100</if_sid>
+    <field name="event">^policy_revoked$</field>
+    <description>ptscry: sessions of $(user) ended by policy ($(reason))</description>
+  </rule>
+
+  <!-- Salute dell'audit: il disco e' in pericolo o la registrazione e' fallita -->
+  <rule id="100109" level="12">
+    <if_sid>100100</if_sid>
+    <field name="event">^record_error$|^audit_probe$|^audit_events_lost$</field>
+    <description>ptscry: audit or recording trouble (disk full? failing write?)</description>
+  </rule>
+
+  <!-- Configurazione e ciclo di vita del monitor -->
+  <rule id="100110" level="10">
+    <if_sid>100100</if_sid>
+    <field name="event">^config_reload_failed$</field>
+    <description>ptscry: configuration reload refused ($(error))</description>
+  </rule>
+
+  <rule id="100111" level="7">
+    <if_sid>100100</if_sid>
+    <field name="event">^monitor_start$|^monitor_shutdown$</field>
+    <description>ptscry: monitor $(event) (sessions are lost on a restart)</description>
+  </rule>
+
+  <rule id="100112" level="8">
+    <if_sid>100100</if_sid>
+    <field name="event">^launch_failed$</field>
+    <description>ptscry: shell launch refused for $(user) at stage $(stage)</description>
+  </rule>
+
+  <!-- Front-end SSH -->
+  <rule id="100113" level="8">
+    <if_sid>100100</if_sid>
+    <field name="event">^fe_denied$|^fe_totp_failed$</field>
+    <description>ptscry front-end: login refused for $(user) from $(remote) ($(reason))</description>
+    <group>authentication_failed,</group>
+  </rule>
+
+  <rule id="100114" level="12">
+    <if_sid>100100</if_sid>
+    <field name="event">^fe_totp_locked$</field>
+    <description>ptscry front-end: TOTP lockout for $(user) from $(remote) (code guessing?)</description>
+    <group>authentication_failures,</group>
+  </rule>
+
+  <rule id="100115" level="6">
+    <if_sid>100100</if_sid>
+    <field name="event">^fe_auth_failures$</field>
+    <description>ptscry front-end: $(count) failed SSH authentications in the last minute ($(sources))</description>
+    <group>authentication_failures,</group>
+  </rule>
+
+  <rule id="100116" level="10">
+    <if_sid>100100</if_sid>
+    <field name="event">^frontend_exit$|^frontend_config_error$|^fe_keys_error$</field>
+    <description>ptscry front-end: $(event) (service interrupted or misconfigured)</description>
+  </rule>
+
+  <rule id="100121" level="3">
+    <if_sid>100100</if_sid>
+    <field name="event">^fe_login$</field>
+    <description>ptscry front-end: $(user) logged in from $(remote) with $(method)</description>
+    <group>authentication_success,</group>
+  </rule>
+
+  <!-- Aggiornamento del monitor sul posto (0.5.4) e job staccati (0.5.2) -->
+  <rule id="100122" level="5">
+    <if_sid>100100</if_sid>
+    <field name="event">^admin_reexec$|^monitor_reexec$|^monitor_resumed$</field>
+    <description>ptscry: monitor re-exec in place (event $(event)); correlate with a planned update</description>
+  </rule>
+
+  <rule id="100123" level="12">
+    <if_sid>100100</if_sid>
+    <field name="event">^monitor_reexec_failed$|^monitor_resume_failed$</field>
+    <description>ptscry: monitor re-exec FAILED ($(event)); check the audit log and the sessions</description>
+  </rule>
+
+  <rule id="100124" level="3">
+    <if_sid>100100</if_sid>
+    <field name="event">^job_collect$|^job_discard$</field>
+    <description>ptscry: $(user) $(event) of detached job</description>
+  </rule>
+
+  <!-- Traccia informativa: nascita delle sessioni (utile per le ricerche, non per gli allarmi) -->
+  <rule id="100120" level="3">
+    <if_sid>100100</if_sid>
+    <field name="event">^session_new$</field>
+    <description>ptscry: session $(session) started by $(user)</description>
+  </rule>
+
+</group>

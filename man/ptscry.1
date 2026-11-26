@@ -1,0 +1,290 @@
+.\" ptscry - Guido Cauli <guido.cauli@gmail.com>
+.TH PTSCRY 1 "26 novembre 2026" "ptscry 0.7.0" "Comandi utente"
+.SH NOME
+ptscry \- Guido Cauli <guido.cauli@gmail.com> \- sessioni PTY persistenti e auditate
+.SH SINTASSI
+.B ptscry new
+[\fB\-d\fR] [\fB\-A\fR] [\fB\-n\fR \fInome\fR] [\fIcomando\fR [\fIargomenti\fR...]]
+.br
+.B ptscry attach
+[\fB\-r\fR] [\fB\-c\fR] [\fInome\fR]
+.br
+.B ptscry list
+|
+.B kill
+\fInome\fR |
+.B freeze
+\fInome\fR |
+.B thaw
+\fInome\fR |
+.B stop
+|
+.B config
+.br
+.B ptscry rename
+\fIvecchio\fR \fInuovo\fR |
+.B notify
+\fInome\fR [\fItesto\fR...] |
+.B send\-keys
+[\fB\-l\fR] \fInome\fR [\fItasti\fR...]
+.br
+.B ptscry layout
+.B list
+[\fB\-j\fR] |
+.B show
+\fInome\fR |
+.B save
+\fInome\fR [\fIfile\fR|\fB\-\fR] |
+.B rm
+\fInome\fR
+|
+.B version
+.br
+.B ptscry admin
+.B list
+|
+.B kill
+\fIutente\fR \fIsessione\fR |
+.B stop
+\fIutente\fR
+.br
+.B ptscry audit\-verify
+[\fIfile\fR...]
+.br
+.B ptscry check
+[\fB\-c\fR \fIfile\fR] [\fB\-u\fR \fIutente\fR]
+.br
+.B ptscry monitor
+[\fB\-c\fR \fIfile\fR]
+.br
+.B ptscry login
+[\fB\-n\fR \fInome\fR]
+.SH DESCRIZIONE
+.B ptscry
+mantiene sessioni di terminale (pseudoterminali) che sopravvivono alla
+disconnessione: ci si stacca (\fIdetach\fR), ci si ricollega (\fIattach\fR) anche da un
+altro computer e si ritrova la sessione, con il suo output recente (\fIreplay\fR).
+Ogni richiesta e ogni evento di sessione sono scritti in un audit a prova di
+manomissione; le sessioni possono essere registrate.
+.PP
+Un \fBmonitor\fR privilegiato (servizio systemd) autentica i client con le credenziali del
+kernel, applica la policy, scrive audit e registrazioni e avvia, per ogni utente, un
+processo \fBhost\fR con i privilegi dell'utente che possiede le sue sessioni.
+L'autenticazione forte (certificati SSH, FIDO2, TOTP, HBAC di FreeIPA) e' quella di
+OpenSSH: ptscry sta dietro sshd.
+.SH COMANDI
+.TP
+.BR new " [" \-d "] [" \-A "] [" \-n " \fInome\fR] [\fIcomando\fR...]"
+Crea una sessione e vi si attacca. Senza comando avvia la shell dell'utente.
+Senza \fB\-n\fR il nome e' scelto automaticamente (s1, s2, ...).
+.RS
+.TP
+.B \-d
+crea senza attaccarsi e stampa il nome.
+.TP
+.B \-A
+se la sessione \fInome\fR esiste gia', vi si attacca (come \fBtmux new\-session \-A\fR).
+.TP
+.B \-n \fInome\fR
+nome della sessione: lettere, cifre, \fB. _ \-\fR, al massimo 64 caratteri.
+.RE
+.TP
+.BR run " [" \-d "] [" \-n " \fInome\fR] [" \-k "] [" \-q "] \fIcomando\fR..."
+Esegue \fIcomando\fR come sessione senza terminale, ne mostra l'output e termina con
+il suo codice di uscita; la sessione si chiude quando il comando finisce. Se il client
+cade il comando continua, salvo \fB\-k\fR (lo uccide). Con \fB\-d\fR il comando
+viene avviato e \fBrun\fR torna subito stampando il nome: codice di uscita e coda
+dell'output restano nell'host per \fBjob_retention\fR e si ritirano con \fBwait\fR.
+.TP
+.BR wait " [" \-q "] [" \-x "] \fInome\fR"
+Segue in sola lettura una sessione, o ritira il risultato di un job finito, e termina
+con il suo codice di uscita. \fB\-x\fR scarta il risultato dopo il ritiro.
+.TP
+.BR status " [" \-j "] \fInome\fR"
+Stampa \fIrunning\fR, \fIfinished exit=N\fR o \fIunknown\fR (stato di uscita 4); \fB\-j\fR in JSON.
+.TP
+.BR attach " [" \-r "] [" \-c "] [\fInome\fR]"
+Si attacca a una sessione. Il nome si puo' omettere se ne esiste una sola.
+\fB\-r\fR: sola lettura. \fB\-c\fR: la crea se manca.
+.TP
+.B list
+Elenca le sessioni dell'utente (nome, pid, client collegati, comando).
+.TP
+.B kill \fInome\fR
+Chiude (SIGHUP, poi SIGKILL) la sessione indicata.
+.TP
+.B freeze \fInome\fR
+Congela la sessione: tutti i suoi processi vengono fermati (SIGSTOP) dove si trovano; il terminale resta collegato e
+\fBlist\fR la segna come \fB[frozen]\fR. Un \fBkill\fR la scongela prima di chiuderla.
+.TP
+.B thaw \fInome\fR
+Scongela la sessione (SIGCONT). La shell puo' mostrare \fBStopped\fR per il programma in primo piano: e' solo la sua notifica.
+.TP
+.B stop
+Ferma l'host dell'utente e con esso tutte le sue sessioni.
+.TP
+.B rename \fIvecchio\fR \fInuovo\fR
+Rinomina una sessione. Il nome di creazione resta riservato finche' la sessione vive; \fBPTSCRY_SESSION\fR nelle
+shell gia' aperte non cambia.
+.TP
+.B notify \fInome\fR [\fItesto\fR...]
+Mostra un avviso sui terminali collegati alla sessione (senza testo: standard input). Il testo e' ripulito da
+caratteri di controllo e sequenze di escape; max 1024 byte, 10 avvisi ogni 10 secondi per sessione.
+.TP
+.B send\-keys \fR[\fB\-l\fR] \fInome\fR [\fItasti\fR...]
+Digita nella sessione: ogni argomento e' un nome di tasto (\fBEnter\fR, \fBTab\fR, \fBEscape\fR, \fBSpace\fR,
+\fBBSpace\fR, \fBUp\fR, \fBDown\fR, \fBLeft\fR, \fBRight\fR, \fBHome\fR, \fBEnd\fR, \fBPageUp\fR, \fBPageDown\fR,
+\fBF1\fR..\fBF12\fR, \fBC\-\fIx\fR, \fBM\-\fIx\fR) oppure testo letterale (\fB\-l\fR: tutto letterale); senza tasti
+legge lo standard input. Max 4096 byte; l'audit registra solo la lunghezza.
+.TP
+.B layout list \fR[\fB\-j\fR] | \fBshow\fR \fInome\fR | \fBsave\fR \fInome\fR [\fIfile\fR|\fB\-\fR] | \fBrm\fR \fInome\fR
+Disposizioni (pannelli e sessioni) salvate sul server per la GUI e il client: oggetti JSON di al massimo 16 KiB,
+al massimo 256, in \fI~/.local/state/ptscry/layouts/\fR, scritti dall'host dell'utente.
+.TP
+.B tui \fR[\fB\-l\fR \fIdisposizione\fR] [\fIsessione\fR...] | \fBattach \-l\fR \fIdisposizione\fR
+Sessioni in pannelli su questo terminale: avvia
+.BR ptscry-tui (1).
+.TP
+.B split \fR[\fB\-h\fR|\fB\-v\fR] | \fBlayout apply\fR \fInome\fR
+Dentro un pannello di ptscry-tui o di ptscry-gui: chiede un nuovo pannello (affiancato o sotto) o una disposizione
+salvata (sequenza OSC 7799 nell'output).
+.TP
+.B config
+Mostra la configurazione effettiva per l'utente (limiti, ciclo di vita, registrazione).
+.SS Amministrazione (root o membri di admin_group)
+.TP
+.B admin list
+Tutte le sessioni di tutti gli utenti (non il contenuto).
+.TP
+.B admin kill \fIutente\fR \fIsessione\fR
+Chiude una sessione di un utente.
+.TP
+.B admin stop \fIutente\fR
+Chiude tutte le sessioni di un utente. Le azioni admin sono auditate con l'identita' dell'amministratore.
+.TP
+.B admin reexec
+Solo root. Sostituisce sul posto il binario del monitor (stesso pid, sessioni e connessioni SSH del front-end intatte); equivale a SIGUSR2. Prima verifica il nuovo binario con \fBmonitor \-t\fR; se fallisce non cambia nulla. Esito nell'audit (\fBmonitor_resumed\fR o \fBmonitor_reexec_failed\fR).
+.TP
+.B audit\-verify [\fIfile\fR...]
+Verifica numero di sequenza e catena di hash dell'audit. Piu' file, nell'ordine
+cronologico, sono verificati come un'unica catena (rotazione). Senza argomenti verifica
+\fI/var/log/ptscry/audit.log\fR. Esce con 1 se la catena e' rotta.
+.TP
+.B check [\-c \fIfile\fR] [\-u \fIutente\fR] [\-color=auto|always|never]
+(vecchio nome: \fBdoctor\fR) Controlla la distribuzione (build cgo, permessi, gruppi, ptrace_scope, monitor, audit,
+syslog, NTP, pty) con il riferimento ai controlli ISO/IEC 27001, e un utente: l'utente corrente, o quello dato con
+\fB\-u\fR (con \fBsudo\fR, chi ha lanciato sudo). Per l'utente verifica l'appartenenza all'\fBaccess_group\fR
+(CRIT se manca), indica se e' nell'\fBadmin_group\fR (solo informazione), che ptscry non sia disabilitato per lui e che
+abbia una shell interattiva. Come root mostra anche la policy sshd effettiva (\fBsshd \-T \-C\fR). Ogni riga e' \fBOK\fR (verde), \fBWARN\fR (giallo) o \fBCRIT\fR (rosso); i colori solo su un terminale (\fBNO_COLOR\fR li
+disattiva, \fB\-color=always|never|auto\fR li forza). Esce con 1 se c'e' un CRIT.
+.TP
+.B monitor [\-t] [\-c \fIfile\fR]
+Esegue il monitor (richiede root). Normalmente lo avvia systemd. Con \fB\-t\fR controlla solo la configurazione e il binario ed esce.
+.TP
+.B setup\fR [\fBusers\fR|\fBkeys\fR]
+(root) senza altri argomenti apre una procedura guidata testuale (menu numerati) per gli utenti e le chiavi.
+.TP
+.B setup frontend
+(root) attiva il front-end SSH in un passo: account \fBptscry\-fe\fR, chiave host, directory delle chiavi,
+\fBfrontend = yes\fR in ptscry.conf (verificato prima di scriverlo; il vecchio file resta come .bak), reload del monitor;
+indica la porta da aprire nel firewall. Ripeterlo non cambia nulla.
+.TP
+.B setup users list\fR | \fBadd\fR [\fB\-admin\fR] [\fB\-create\fR] [\fB\-shell\fR \fIpercorso\fR] \fIutente\fR... | \fBremove\fR [\fB\-admin\fR] \fIutente\fR...
+elenca i membri di access_group e admin_group; aggiunge un utente ai gruppi (\-admin: anche admin_group; \-create: crea
+l'account locale se manca); lo toglie (\-admin: solo da admin_group; l'account resta). I gruppi locali si cambiano con
+gpasswd; per i gruppi di FreeIPA/SSSD il comando dice il comando \fBipa\fR da usare.
+.TP
+.B setup keys list\fR [\fIutente\fR] | \fBadd\fR \fIutente\fR \fIfile\fR|\fB\-\fR|\fB\-home\fR | \fBremove\fR \fIutente\fR \fIN\fR|\fISHA256:...\fR
+chiavi pubbliche del front-end SSH (frontend_authorized_keys_dir): elenco con impronte, importazione da file, da standard
+input o dal ~/.ssh/authorized_keys dell'utente (rifiuta chiavi private, doppioni e opzioni che il front-end non rispetta),
+rimozione per numero o impronta.
+.TP
+.B totp\-init [\-f] \fIutente\fR
+(root) crea il segreto TOTP dell'utente per il front-end SSH e ne stampa il valore e l'URI otpauth://. Non sovrascrive senza \-f.
+.TP
+.B frontend
+il front-end SSH: lo avvia il monitor (\fBfrontend = yes\fR), non va lanciato a mano.
+.TP
+.B login [\-n \fInome\fR]
+Per \fBForceCommand\fR di sshd: un login apre o riattacca la sessione \fInome\fR
+(default \fImain\fR); sono ammessi solo \fBptscry new|attach|list|kill|version\fR, ogni altro
+comando e' rifiutato (codice 126).
+.SS Client remoto (front-end SSH)
+.TP
+.B \-H [\fIutente\fB@]\fIhost\fB[:\fIporta\fB] [\-i \fIchiave\fB] [\-c \fIcertificato\fB] [\-F SHA256:...] [\fIcomando\fB...]
+Esegue gli stessi comandi su un altro server tramite il suo front-end SSH (porta 2222). Senza comando: \fBnew \-A \-n main\fR.
+Usa ssh\-agent (anche chiavi FIDO2), chiede il codice TOTP, ricorda la chiave del server in \fIknown_hosts\fR e, se la
+rete cade, si ricollega alla sessione. Su macOS e Windows e' l'unica modalita' (senza \fB\-H\fR: \fBserver =\fR in
+\fBclient.conf\fR o \fBPTSCRY_SERVER\fR).
+.SH DENTRO UNA SESSIONE
+.TP
+.B Ctrl\-B d
+stacca il client; la sessione continua.
+.TP
+.B Ctrl\-B Ctrl\-B
+invia un Ctrl\-B letterale.
+.TP
+.B Ctrl\-B h\fR (o \fBCtrl\-B ?\fR)
+mostra l'elenco di questi tasti e dei comandi da usare fuori dalla sessione (non arriva al programma; Ctrl\-L ridisegna lo schermo).
+.TP
+.B Ctrl\-B s
+elenco delle sessioni: si scrive per filtrare, frecce per scegliere, Invio per passarvi, Esc per tornare.
+.TP
+.B Ctrl\-B ( \fR/\fB )
+sessione precedente / successiva (in ordine alfabetico).
+.TP
+.B Ctrl\-B L
+la sessione in cui si era prima di questa.
+.TP
+.B Ctrl\-B c
+nuova sessione (nome automatico).
+.TP
+.B Ctrl\-B $
+rinomina la sessione corrente.
+.TP
+.B Ctrl\-B f
+congela / scongela la sessione corrente.
+.TP
+.B Ctrl\-B m \fR/\fB M
+avvisa (si/no) di attivita' / di 30 secondi di silenzio nelle altre sessioni.
+.PP
+Valgono anche attraverso il front\-end SSH. Ogni cambio di sessione e' un normale stacco e riattacco
+(\fBdetach\fR/\fBattach\fR in audit).
+.PP
+Il prefisso (default Ctrl\-B) si cambia con \fBprefix = ctrl\-a\fR in \fBclient.conf\fR o con
+\fBdetach_prefix\fR in \fBptscry.conf\fR(5); vedi FILE.
+.PP
+Nell'ambiente della sessione sono definite \fBPTSCRY=1\fR e \fBPTSCRY_SESSION\fR=\fInome\fR.
+.SH AMBIENTE
+.TP
+.B PTSCRY_CONFIG
+file di configurazione al posto di \fI/etc/ptscry/ptscry.conf\fR (solo client e check;
+il monitor usa \fB\-c\fR).
+.TP
+.B PTSCRY_STANDALONE
+\fB1\fR: modalita' di sviluppo senza monitor, host avviato dall'utente. L'audit
+non e' a prova di manomissione.
+.SH FILE
+.TP
+.I /etc/ptscry/ptscry.conf
+configurazione (vedi \fBptscry.conf\fR(5)).
+.TP
+.I /run/ptscry/monitor.sock
+socket del monitor.
+.TP
+.I /var/log/ptscry/audit.log
+audit (JSON, una riga per evento, root 0600; root:\fBaudit_group\fR 0640 se impostato).
+.TP
+.I /var/log/ptscry/rec/UID\-UTENTE/
+registrazioni asciicast v2 (root 0600).
+.TP
+.I ~/.config/ptscry/client.conf
+(macOS: \fI~/Library/Application Support/ptscry/client.conf\fR; Windows: \fI%APPDATA%\\ptscry\\client.conf\fR)
+configurazione del client: \fBprefix\fR, \fBserver\fR, \fBidentity\fR, \fBcertificate\fR (esempio in contrib/client.conf). Linux legge anche
+\fI/etc/ptscry/client.conf\fR (vince quello dell'utente). Ignorato se non e' dell'utente o e' scrivibile da altri.
+.SH CODICI DI USCITA
+0 successo; 1 errore; 126 comando non ammesso (\fBlogin\fR). Per \fBnew\fR e \fBattach\fR,
+alla fine della sessione e' stampato lo stato di uscita della shell.
+.SH VEDERE ANCHE
+.BR ptscry.conf (5),
+\fIdocs/MANUALE.md\fR, \fIdocs/ISO27001.md\fR, \fBsshd_config\fR(5), \fBasciinema\fR(1)

@@ -1,0 +1,11 @@
+# build outputs
+/dist-gui/
+/dist-server/
+/ptscry
+/ptscry-tui
+/gui/gui
+/gui/ptscry-gui
+/tui/tui
+*.test
+# fuzzing corpus found locally
+testdata/fuzz/

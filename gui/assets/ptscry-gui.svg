@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <title>ptscry-gui</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6d4de0"/>
+      <stop offset="1" stop-color="#12b5b0"/>
+    </linearGradient>
+    <linearGradient id="front" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#dfe9f5"/>
+    </linearGradient>
+  </defs>
+  <!-- round badge -->
+  <circle cx="128" cy="128" r="120" fill="url(#bg)"/>
+  <circle cx="128" cy="128" r="120" fill="none" stroke="#ffffff" stroke-opacity=".25" stroke-width="4"/>
+  <!-- three stacked panes: the multiplexer -->
+  <rect x="66" y="56" width="124" height="86" rx="14" fill="#ffffff" fill-opacity=".30"/>
+  <rect x="56" y="74" width="136" height="92" rx="14" fill="#ffffff" fill-opacity=".50"/>
+  <rect x="46" y="92" width="148" height="100" rx="14" fill="url(#front)"/>
+  <rect x="46" y="92" width="148" height="22" rx="14" fill="#2b2f4a"/>
+  <rect x="46" y="104" width="148" height="10" fill="#2b2f4a"/>
+  <circle cx="62" cy="103" r="4" fill="#ff6b6b"/><circle cx="76" cy="103" r="4" fill="#ffd166"/><circle cx="90" cy="103" r="4" fill="#06d6a0"/>
+  <path d="M66 136 L88 150 L66 164" fill="none" stroke="#2b2f4a" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="100" y="162" width="34" height="8" rx="3" fill="#6d4de0"/>
+  <!-- "stays alive": a chain link at the lower right -->
+  <circle cx="190" cy="190" r="34" fill="#12162b"/>
+  <circle cx="190" cy="190" r="34" fill="none" stroke="#ffffff" stroke-opacity=".6" stroke-width="3"/>
+  <rect x="166" y="181" width="28" height="18" rx="9" fill="none" stroke="#12b5b0" stroke-width="6"/>
+  <rect x="186" y="181" width="28" height="18" rx="9" fill="none" stroke="#9b86ff" stroke-width="6"/>
+</svg>

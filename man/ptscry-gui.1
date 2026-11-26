@@ -1,0 +1,131 @@
+.\" ptscry-gui - Guido Cauli <guido.cauli@gmail.com>
+.TH PTSCRY-GUI 1 "26 novembre 2026" "ptscry-gui 0.8.0" "Comandi utente"
+.SH NOME
+ptscry-gui \- Guido Cauli <guido.cauli@gmail.com> \- terminale grafico a tab con sessioni persistenti ptscry
+.SH SINTASSI
+.B ptscry-gui
+[\fB\-H\fR [\fIutente\fR@]\fIhost\fR[:\fIporta\fR]] [\fB\-s\fR \fIsessione\fR]
+.br
+.B ptscry-gui \-version
+.SH DESCRIZIONE
+.B ptscry-gui
+e' un terminale grafico con schede (tab) in cui ogni tab e' una sessione persistente di
+.BR ptscry (1).
+Chiudere la finestra, uscire dal desktop o perdere la rete non ferma i programmi: restano nella sessione e alla
+riapertura il tab si riattacca. Funziona su Wayland e X11 (anche con window manager a tasselli), Windows e macOS.
+.SH OPZIONI
+.TP
+.BI \-H " [utente@]host[:porta]"
+Apre subito un tab su questo server e ne salva il profilo. Senza \fB\-H\fR si usa il profilo predefinito
+(impostazioni) e, se attivo, si riaprono i tab dell'ultima volta.
+.TP
+.BI \-s " sessione"
+Nome della sessione del primo tab; se esiste ci si riattacca, altrimenti viene creata.
+.TP
+.B \-version
+Stampa la versione ed esce.
+.SH PROFILI
+.TP
+.B senza server
+Predefinito su Linux e macOS. Esegue
+.B ptscry
+in modo standalone (\fBPTSCRY_STANDALONE=1\fR) sul computer locale: nessun root, nessun SSH. Richiede il comando
+.B ptscry
+accanto a
+.B ptscry-gui
+o nel PATH. Non disponibile su Windows.
+.TP
+.B terminale locale
+Predefinito su Windows. Una shell di questo computer su una pseudoconsole. La shell si sceglie per ogni tab e, come predefinita, nelle impostazioni, tra quelle installate (Linux e macOS: \fI/etc/shells\fR; Windows: PowerShell 7, Windows PowerShell, cmd, Git Bash, MSYS2, Cygwin, WSL) o con un comando qualsiasi. Non e' persistente: chiudere il tab termina la shell.
+.TP
+.B locale
+Front-end SSH di questo computer, 127.0.0.1:2222 (server con \fBfrontend = yes\fR).
+.TP
+.B remoto
+\fI[utente@]host[:porta]\fR, con chiave privata (file o ssh-agent), certificato e TOTP. La chiave del server si accetta
+al primo uso e si salva in \fI~/.config/ptscry/known_hosts\fR; se cambia, il collegamento e' rifiutato.
+.SH MENU
+La barra dei menu (visibile di default; con \fBVista\fR si nasconde e resta il pulsante a tre linee \fB\[u2630]\fR) contiene:
+.TP
+.B File
+Nuova sessione (terminale locale, server locale, SSH, ptscry; connessioni salvate in un elenco ricercabile), Rinomina, Chiudi; Gestione ptscry (tutti i comandi di
+.BR ptscry ),
+Chiavi private (importa con il selettore di file di sistema), Impostazioni; Esci.
+.TP
+.B Tab
+Tab successivo e precedente, elenco dei tab aperti.
+.TP
+.B Sessione
+Sessioni del server (apri, sola lettura, congela, termina), Disconnetti, Congela/Scongela, Variabili d'ambiente, Workspace.
+.TP
+.B Modifica
+Copia, Incolla.
+.TP
+.B Vista
+Carattere del terminale (anche la scelta tra i font a spaziatura fissa del sistema) e dimensione dell'interfaccia (ingrandisci, riduci, normale), barra dei menu, schermo intero.
+.TP
+.B Finestra
+Ingrandisci/ripristina, riduci a icona. I pulsanti di finestra sono anche a destra dei tab.
+.TP
+.B Aiuto
+Informazioni.
+.SH SCORCIATOIE
+.TS
+l l.
+Ctrl+Maiusc+T	nuova sessione
+Ctrl+Maiusc+W	chiude il pannello, o il tab se e' l'unico (la sessione resta viva)
+Ctrl+Maiusc+R	rinomina il tab
+Ctrl+PagGiu / PagSu	tab successivo / precedente
+Ctrl+Tab / Ctrl+Maiusc+Tab	tab successivo / precedente
+Ctrl+Maiusc+C / V	copia / incolla (anche Ctrl+Ins, Maiusc+Ins)
+Maiusc+PagSu / PagGiu	scorre lo storico
+Ctrl + + / \- / 0	carattere piu' grande / piu' piccolo / normale (anche Ctrl+rotella)
+Ctrl+Maiusc+S	sessioni del server
+Ctrl+Maiusc+O	workspace
+Ctrl+Maiusc+E	variabili d'ambiente del tab
+Ctrl+Maiusc+D	disconnette il tab (la sessione continua; Invio riattacca)
+Ctrl+Maiusc+F	congela / scongela la sessione
+Alt+Maiusc++ / \-	divide il pannello a destra / sotto
+Alt+frecce	pannello vicino
+Alt+Maiusc+frecce	ridimensiona il pannello
+Alt+Maiusc+O	pannello successivo
+Alt+Maiusc+Z	ingrandisce il pannello / li mostra tutti
+Alt+Maiusc+Spazio	disposizione successiva
+Alt+Maiusc+S	input sincronizzato su tutti i pannelli
+Alt+Maiusc+L	disposizioni salvate sul server
+.TE
+.PP
+Su macOS \fICtrl+Maiusc\fR diventa \fI\[u2318]X\fR dove indicato nei menu. Il distacco di
+.B ptscry
+(\fICtrl\-B d\fR) funziona come nel client a riga di comando.
+.SH FILE
+.TP
+.I ~/.config/ptscry/gui.json
+Impostazioni e workspace (permessi 0600; nessuna password ne' codice TOTP). Su Windows \fI%AppData%\\ptscry\fR, su macOS
+\fI~/Library/Application Support/ptscry\fR.
+.TP
+.I ~/.config/ptscry/keys/
+Chiavi private importate (0600).
+.TP
+.I ~/.config/ptscry/known_hosts
+Chiavi dei server accettate.
+.TP
+.I ~/.config/ptscry/local.conf
+Configurazione del profilo "senza server".
+.TP
+.I ~/.local/state/ptscry/
+Socket, audit e registrazioni del profilo "senza server".
+.SH AMBIENTE
+.TP
+.B PTSCRY_STANDALONE, PTSCRY_CONFIG, PTSCRY_NO_PREFIX
+Impostate dalla GUI per il profilo "senza server". \fBPTSCRY_NO_PREFIX=1\fR spegne il prefisso di distacco del client (Ctrl-B o quello di client.conf): tutti i tasti, Ctrl+A, Ctrl+B, Ctrl+E..., arrivano alla shell; per staccarsi c'e' Ctrl+Maiusc+D.
+.SH DIAGNOSTICA
+Il comando esce con 2 e mostra l'uso se le opzioni non sono valide. Gli errori di connessione compaiono nel tab; \fBInvio\fR
+riattacca. Altri rimedi nel capitolo "Problemi comuni" di
+.IR GUI.md .
+.SH VEDERE ANCHE
+.BR ptscry (1),
+.BR ptscry.conf (5);
+documentazione in \fI/usr/share/doc/ptscry-gui/\fR (pacchetti), \fI/usr/local/share/doc/ptscry-gui/\fR (\fIGUIDA-GUI.md\fR, \fIGUI.md\fR) o \fI~/.local/share/doc/ptscry-gui/\fR.
+.SH AUTORE
+Guido Cauli <guido.cauli@gmail.com>

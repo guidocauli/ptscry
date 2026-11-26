@@ -1,0 +1,25 @@
+{
+  "description": "ptscry - Guido Cauli <guido.cauli@gmail.com> - audit JSON record (file or syslog) to ECS-style fields",
+  "processors": [
+    { "grok": { "field": "message", "patterns": ["(?<ptscry_json>\\{.*\\})"], "ignore_failure": false } },
+    { "json": { "field": "ptscry_json", "target_field": "ptscry" } },
+    { "remove": { "field": "ptscry_json" } },
+    { "date": { "field": "ptscry.ts", "formats": ["ISO8601"], "target_field": "@timestamp" } },
+    { "set": { "field": "event.kind", "value": "event" } },
+    { "set": { "field": "event.dataset", "value": "ptscry.audit" } },
+    { "set": { "field": "event.module", "value": "ptscry" } },
+    { "set": { "field": "event.action", "copy_from": "ptscry.event", "ignore_empty_value": true } },
+    { "set": { "field": "user.name", "copy_from": "ptscry.user", "ignore_empty_value": true } },
+    { "set": { "field": "user.id", "copy_from": "ptscry.uid", "ignore_empty_value": true } },
+    { "set": { "field": "event.sequence", "copy_from": "ptscry.seq", "ignore_empty_value": true } },
+    { "script": {
+        "lang": "painless",
+        "description": "Mark refusals and failures as ECS failures",
+        "source": "if (ctx.ptscry != null && ctx.ptscry.event != null) { String e = ctx.ptscry.event; if (e == 'access_denied' || e == 'limit_reached' || e == 'rate_limited' || e == 'record_error' || e == 'config_reload_failed' || e == 'host_flood' || e == 'launch_failed' || e == 'fe_denied' || e == 'fe_totp_failed' || e == 'fe_totp_locked' || e == 'frontend_exit' || e == 'frontend_config_error' || e == 'monitor_reexec_failed' || e == 'monitor_resume_failed') { ctx.event.outcome = 'failure'; } }"
+    } }
+  ],
+  "on_failure": [
+    { "set": { "field": "event.kind", "value": "pipeline_error" } },
+    { "set": { "field": "error.message", "value": "{{ _ingest.on_failure_message }}" } }
+  ]
+}

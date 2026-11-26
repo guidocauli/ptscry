@@ -1,0 +1,20 @@
+#!/bin/sh
+# ptscry-setup-frontend - Guido Cauli <guido.cauli@gmail.com>
+# Prepares the built-in SSH front-end of ptscry (same as "make frontend"): its
+# account without login shell, the SSH host key, the directory of the public
+# keys. Idempotent: what exists is left alone. Then set "frontend = yes" in
+# /etc/ptscry/ptscry.conf (manual, 3.5).
+set -e
+[ "$(id -u)" = 0 ] || { echo "ptscry-setup-frontend: run as root" >&2; exit 1; }
+nologin=/usr/sbin/nologin; [ -x "$nologin" ] || nologin=/sbin/nologin
+if getent passwd ptscry-fe >/dev/null; then echo "user ptscry-fe: already exists"
+else useradd -r -M -s "$nologin" -c "ptscry ssh front-end" ptscry-fe && echo "user ptscry-fe: created"; fi
+install -d -o root -g root -m 0755 /etc/ptscry /etc/ptscry/authorized_keys.d
+if [ -e /etc/ptscry/ssh_host_ed25519_key ]; then echo "host key: already exists"
+else
+  ssh-keygen -q -t ed25519 -N '' -C "ptscry front-end" -f /etc/ptscry/ssh_host_ed25519_key
+  chown root:root /etc/ptscry/ssh_host_ed25519_key*; chmod 0600 /etc/ptscry/ssh_host_ed25519_key
+  echo "host key: created (fingerprint: $(ssh-keygen -lf /etc/ptscry/ssh_host_ed25519_key.pub | cut -d' ' -f2))"
+fi
+echo "Now: set 'frontend = yes' in /etc/ptscry/ptscry.conf, put each user's public key in"
+echo "  /etc/ptscry/authorized_keys.d/USER (one per line), then: systemctl reload ptscry-monitor && ptscry check"

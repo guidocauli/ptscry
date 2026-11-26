@@ -1,0 +1,11 @@
+<!-- ptscry - Guido Cauli <guido.cauli@gmail.com> -->
+<!-- Solo se l'audit arriva al manager via syslog (rsyslog -> manager) invece che dall'agent.
+     Il messaggio syslog e' "ptscry: {json}". Copia in /var/ossec/etc/decoders/. -->
+<decoder name="ptscry">
+  <program_name>^ptscry$</program_name>
+</decoder>
+
+<decoder name="ptscry-json">
+  <parent>ptscry</parent>
+  <plugin_decoder>JSON_Decoder</plugin_decoder>
+</decoder>

@@ -1,0 +1,53 @@
+.TH PTSCRY-TUI 1 "26 novembre 2026" "ptscry-tui 0.7.0" "Comandi utente"
+.SH NOME
+ptscry-tui \- sessioni ptscry in pannelli su un terminale di testo (Guido Cauli <guido.cauli@gmail.com>)
+.SH SINTASSI
+.B ptscry-tui
+[\fB\-l\fR \fIdisposizione\fR] [\fB\-s\fR] [\fB\-m\fR] [\fIsessione\fR...]
+.br
+.B ptscry-tui \-H
+[\fIutente\fB@\fR]\fIhost\fR[\fB:\fIporta\fR] [\fB\-i\fR \fIchiave\fR] [\fB\-c\fR \fIcertificato\fR] [\fB\-F\fR \fISHA256:...\fR] [\fB\-l\fR \fIdisposizione\fR] [\fIsessione\fR...]
+.br
+.B ptscry tui
+\&... |
+.B ptscry attach \-l
+\fIdisposizione\fR
+.SH DESCRIZIONE
+Divide il terminale in pannelli, come tmux o zellij. Ogni pannello e' una sessione
+.BR ptscry (1)
+a se' (con il suo audit e la sua registrazione): in locale il client ptscry di questo computer
+su uno pseudoterminale, con \fB\-H\fR un canale della stessa connessione SSH al front-end del server.
+Chiudere un pannello o uscire stacca soltanto: le sessioni continuano.
+Senza sessioni apre \fBmain\fR; \fB\-l\fR apre una disposizione salvata con \fBptscry layout\fR o da ptscry-gui.
+\fB\-s\fR toglie la barra di stato, \fB\-m\fR non cattura il mouse (anche \fBstatus = off\fR, \fBmouse = off\fR in client.conf).
+.SH TASTI (dopo il prefisso, Ctrl\-B o quello di client.conf)
+.TS
+l l.
+% / "	divide affiancato / uno sopra l'altro
+frecce, o, ;	pannello vicino / successivo / precedente
+Alt+frecce, Ctrl+frecce	ridimensiona (5 / 1 colonne)
+z	ingrandisce il pannello e torna indietro
+Spazio	disposizione successiva (affiancati, impilati, principale, griglia)
+x	chiude il pannello (solo distacco)
+S	input sincronizzato su tutti i pannelli (SYNC INPUT nella barra)
+[	modalita' copia: frecce, PagSu/PagGiu, / ? n N cerca, Spazio seleziona, Invio copia (OSC 52), q esce
+/	cerca
+W / O	salva / apre una disposizione sul server
+d	stacca tutto ed esce
+? o h	aiuto
+.TE
+.PP
+Gli altri tasti (\fBs ( ) L c $ f m M w\fR e il prefisso ripetuto) vanno al client ptscry del pannello:
+elenco delle sessioni, sessione precedente/successiva, nuova, rinomina, congela, avvisi, tastiera condivisa.
+Con il mouse: clic per scegliere il pannello, trascinare le divisioni, rotella per scorrere (modalita' copia);
+Maiusc per la selezione del terminale.
+.PP
+Da dentro un pannello \fBptscry split\fR [\fB\-v\fR] apre un nuovo pannello e \fBptscry layout apply\fR \fInome\fR
+una disposizione: la richiesta passa nell'output (OSC 7799), vale solo dal pannello attivo e fa solo cio' che farebbe un tasto
+(mai spostare la tastiera), al massimo una al secondo (una disposizione ogni 10 s), mai nel replay di un riattacco;
+al massimo 16 pannelli.
+.SH VEDERE ANCHE
+.BR ptscry (1),
+.BR ptscry-gui (1)
+.SH AUTORE
+Guido Cauli <guido.cauli@gmail.com>

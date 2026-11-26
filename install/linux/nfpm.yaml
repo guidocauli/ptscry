@@ -1,0 +1,100 @@
+# ptscry-gui - Guido Cauli <guido.cauli@gmail.com>
+# .deb and .rpm packages, made by build-gui.sh with nfpm (https://nfpm.goreleaser.com):
+#   PKG_VERSION=0.7.5 PKG_ARCH=amd64 PKG_SRC=dist-gui/linux-amd64 nfpm package -f install/linux/nfpm.yaml -p deb
+name: ptscry-gui
+arch: ${PKG_ARCH}
+platform: linux
+version: ${PKG_VERSION}
+release: 1
+section: utils
+priority: optional
+maintainer: Guido Cauli <guido.cauli@gmail.com>
+vendor: Guido Cauli
+license: AGPL-3.0-or-later
+description: |
+  Graphical multi-tab terminal with persistent ptscry sessions - Guido Cauli <guido.cauli@gmail.com>
+  Every tab is a ptscry session that survives closing the window, on this
+  computer (no server, no root) or on a remote ptscry server over SSH.
+overrides:
+  deb:
+    depends:
+      - libc6
+      - libegl1
+      - libwayland-client0
+      - libwayland-cursor0
+      - libwayland-egl1
+      - libxkbcommon0
+      - libxkbcommon-x11-0
+      - libx11-6
+      - libx11-xcb1
+      - libxcursor1
+      - libxfixes3
+  rpm:
+    depends:
+      # by library name: the package names differ between Fedora, Alma/RHEL and openSUSE
+      - libEGL.so.1()(64bit)
+      - libwayland-client.so.0()(64bit)
+      - libwayland-cursor.so.0()(64bit)
+      - libwayland-egl.so.1()(64bit)
+      - libxkbcommon.so.0()(64bit)
+      - libxkbcommon-x11.so.0()(64bit)
+      - libX11.so.6()(64bit)
+      - libX11-xcb.so.1()(64bit)
+      - libXcursor.so.1()(64bit)
+      - libXfixes.so.3()(64bit)
+contents:
+  - src: ${PKG_SRC}/ptscry-gui
+    dst: /usr/lib/ptscry-gui/ptscry-gui
+    file_info: {mode: 0755}
+  - src: ${PKG_SRC}/ptscry
+    dst: /usr/lib/ptscry-gui/ptscry
+    file_info: {mode: 0755}
+  - src: ${PKG_SRC}/ptscry-tui
+    dst: /usr/lib/ptscry-gui/ptscry-tui
+    file_info: {mode: 0755}
+  - src: /usr/lib/ptscry-gui/ptscry-gui
+    dst: /usr/bin/ptscry-gui
+    type: symlink
+  - src: install/linux/ptscry-gui.desktop
+    dst: /usr/share/applications/ptscry-gui.desktop
+    file_info: {mode: 0644}
+  - src: install/linux/ptscry-tui.desktop
+    dst: /usr/share/applications/ptscry-tui.desktop
+    file_info: {mode: 0644}
+  - src: ${PKG_TUIMAN}
+    dst: /usr/share/man/man1/ptscry-tui.1.gz
+    file_info: {mode: 0644}
+  - src: gui/assets/ptscry-gui.svg
+    dst: /usr/share/icons/hicolor/scalable/apps/ptscry-gui.svg
+  - src: gui/assets/ptscry-gui-16.png
+    dst: /usr/share/icons/hicolor/16x16/apps/ptscry-gui.png
+  - src: gui/assets/ptscry-gui-24.png
+    dst: /usr/share/icons/hicolor/24x24/apps/ptscry-gui.png
+  - src: gui/assets/ptscry-gui-32.png
+    dst: /usr/share/icons/hicolor/32x32/apps/ptscry-gui.png
+  - src: gui/assets/ptscry-gui-48.png
+    dst: /usr/share/icons/hicolor/48x48/apps/ptscry-gui.png
+  - src: gui/assets/ptscry-gui-64.png
+    dst: /usr/share/icons/hicolor/64x64/apps/ptscry-gui.png
+  - src: gui/assets/ptscry-gui-128.png
+    dst: /usr/share/icons/hicolor/128x128/apps/ptscry-gui.png
+  - src: gui/assets/ptscry-gui-256.png
+    dst: /usr/share/icons/hicolor/256x256/apps/ptscry-gui.png
+  - src: gui/assets/ptscry-gui-512.png
+    dst: /usr/share/icons/hicolor/512x512/apps/ptscry-gui.png
+  - src: ${PKG_MAN}
+    dst: /usr/share/man/man1/ptscry-gui.1.gz
+    file_info: {mode: 0644}
+  - src: docs/GUIDA-GUI.md
+    dst: /usr/share/doc/ptscry-gui/GUIDA-GUI.md
+  - src: docs/GUI.md
+    dst: /usr/share/doc/ptscry-gui/GUI.md
+  - src: README.md
+    dst: /usr/share/doc/ptscry-gui/README.md
+  - src: LICENSE
+    dst: /usr/share/doc/ptscry-gui/copyright
+  - src: NOTICE.md
+    dst: /usr/share/doc/ptscry-gui/NOTICE.md
+scripts:
+  postinstall: install/linux/postinst.sh
+  postremove: install/linux/postrm.sh

@@ -1,0 +1,28 @@
+#%PAM-1.0
+# ptscry - Guido Cauli <guido.cauli@gmail.com>
+# /etc/pam.d/ptscry   (Debian / Ubuntu)   -- selezionato da pam_service = ptscry
+#
+# L'autenticazione la fa sshd. Qui girano solo le pile "account" e "session", per OGNI sessione
+# creata (non per ogni ricollegamento): e' il punto in cui il sistema puo' ancora dire di no
+# (orari, accessi, HBAC di FreeIPA) e in cui si applicano limiti e login uid.
+#
+# Il file deve essere di root e non scrivibile da altri (il monitor lo verifica all'avvio).
+
+# --- account: decide se la sessione e' ammessa ----------------------------------------
+account    required     pam_nologin.so
+account    include      common-account
+# FreeIPA: la regola HBAC deve consentire il servizio "ptscry" (ipa hbacsvc-add ptscry).
+# Accessi per orario / rete / gruppo:
+#account   required     pam_access.so
+#account   required     pam_time.so
+
+# --- session: imposta l'ambiente della sessione ---------------------------------------
+# login uid per auditd (il launcher lo imposta comunque; qui lo applica anche PAM):
+session    required     pam_loginuid.so
+# limiti da /etc/security/limits.conf e limits.d (nproc, nofile, core...): e' il modo di
+# contenere una fork bomb o un uso eccessivo di risorse di un utente
+session    required     pam_limits.so
+# scope/sessione systemd-logind e XDG_RUNTIME_DIR (richiede systemd; abilitalo se lo usi):
+#session   optional     pam_systemd.so
+# directory home creata al primo accesso (utenti di dominio):
+#session   optional     pam_mkhomedir.so umask=0077

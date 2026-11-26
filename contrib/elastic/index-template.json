@@ -1,0 +1,178 @@
+{
+  "index_patterns": [
+    "ptscry-audit-*"
+  ],
+  "priority": 200,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "index.default_pipeline": "ptscry",
+      "index.lifecycle.name": "ptscry-audit"
+    },
+    "mappings": {
+      "properties": {
+        "ptscry": {
+          "properties": {
+            "ts": {
+              "type": "date"
+            },
+            "seq": {
+              "type": "long"
+            },
+            "prev": {
+              "type": "keyword"
+            },
+            "event": {
+              "type": "keyword"
+            },
+            "host": {
+              "type": "keyword"
+            },
+            "uid": {
+              "type": "long"
+            },
+            "user": {
+              "type": "keyword"
+            },
+            "req": {
+              "type": "long"
+            },
+            "session": {
+              "type": "keyword"
+            },
+            "peer_uid": {
+              "type": "long"
+            },
+            "peer_pid": {
+              "type": "long"
+            },
+            "host_pid": {
+              "type": "long"
+            },
+            "pid": {
+              "type": "long"
+            },
+            "op": {
+              "type": "keyword"
+            },
+            "reason": {
+              "type": "keyword",
+              "ignore_above": 1024
+            },
+            "src": {
+              "type": "keyword"
+            },
+            "loginuid": {
+              "type": "keyword"
+            },
+            "audit_session": {
+              "type": "keyword"
+            },
+            "via_sshd": {
+              "type": "boolean"
+            },
+            "tty": {
+              "type": "keyword"
+            },
+            "client_exe": {
+              "type": "keyword",
+              "ignore_above": 1024
+            },
+            "ssh_connection_claimed": {
+              "type": "keyword"
+            },
+            "cmd": {
+              "type": "keyword",
+              "ignore_above": 1024
+            },
+            "record_file": {
+              "type": "keyword",
+              "ignore_above": 1024
+            },
+            "file": {
+              "type": "keyword",
+              "ignore_above": 1024
+            },
+            "admin": {
+              "type": "keyword"
+            },
+            "target_user": {
+              "type": "keyword"
+            },
+            "exit_code": {
+              "type": "long"
+            },
+            "duration_s": {
+              "type": "long"
+            },
+            "refused": {
+              "type": "long"
+            },
+            "limit": {
+              "type": "long"
+            },
+            "sessions": {
+              "type": "long"
+            },
+            "scope": {
+              "type": "keyword"
+            },
+            "error": {
+              "type": "keyword",
+              "ignore_above": 1024
+            },
+            "remote": {
+              "type": "keyword",
+              "ignore_above": 512
+            },
+            "fp": {
+              "type": "keyword",
+              "ignore_above": 512
+            },
+            "key_type": {
+              "type": "keyword",
+              "ignore_above": 512
+            },
+            "cert_id": {
+              "type": "keyword",
+              "ignore_above": 512
+            },
+            "method": {
+              "type": "keyword",
+              "ignore_above": 512
+            },
+            "via": {
+              "type": "keyword",
+              "ignore_above": 512
+            },
+            "ticket_id": {
+              "type": "keyword",
+              "ignore_above": 512
+            },
+            "listen": {
+              "type": "keyword",
+              "ignore_above": 512
+            },
+            "stage": {
+              "type": "keyword",
+              "ignore_above": 512
+            },
+            "pam_service": {
+              "type": "keyword",
+              "ignore_above": 512
+            },
+            "cert_serial": {
+              "type": "long"
+            },
+            "count": {
+              "type": "long"
+            },
+            "sources": {
+              "type": "keyword"
+            }
+          }
+        }
+      }
+    }
+  }
+}

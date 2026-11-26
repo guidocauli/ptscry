@@ -1,0 +1,69 @@
+# ptscry - Guido Cauli <guido.cauli@gmail.com>
+# Server packages (.deb, .rpm), made by build-server.sh with nfpm. ${PKG_*} are
+# filled in by the script; ${PKG_STAGE} holds the files adapted to /usr/bin.
+name: ptscry
+arch: ${PKG_ARCH}
+platform: linux
+version: ${PKG_VERSION}
+release: 1
+section: admin
+priority: optional
+maintainer: Guido Cauli <guido.cauli@gmail.com>
+vendor: Guido Cauli
+license: AGPL-3.0-or-later
+description: |
+  Persistent, audited PTY sessions (server) - Guido Cauli <guido.cauli@gmail.com>
+  Root monitor and per-user hosts keep terminal sessions alive across
+  disconnections, with a tamper-evident audit log and session recordings,
+  behind OpenSSH or the built-in SSH front-end (FIDO2, certificates, TOTP).
+  Works with local users and FreeIPA/SSSD (NSS, PAM).
+overrides:
+  deb:
+    depends: [libc6 (>= 2.34)]
+    recommends: [openssh-client, logrotate]
+  rpm:
+    depends: [glibc >= 2.34]
+    recommends: [openssh, logrotate]
+contents:
+  - src: ${PKG_STAGE}/ptscry
+    dst: /usr/bin/ptscry
+    file_info: {mode: 0755}
+  - src: ${PKG_STAGE}/ptscry-tui
+    dst: /usr/bin/ptscry-tui
+    file_info: {mode: 0755}
+  - src: install/server/ptscry-setup-frontend
+    dst: /usr/sbin/ptscry-setup-frontend
+    file_info: {mode: 0755}
+  - src: ${PKG_STAGE}/ptscry-monitor.service
+    dst: /usr/lib/systemd/system/ptscry-monitor.service
+    file_info: {mode: 0644}
+  - src: contrib/tmpfiles.d/ptscry.conf
+    dst: /usr/lib/tmpfiles.d/ptscry.conf
+    file_info: {mode: 0644}
+  - src: contrib/ptscry.conf
+    dst: /etc/ptscry/ptscry.conf
+    type: config|noreplace
+    file_info: {mode: 0644}
+  - src: ${PKG_PAM}
+    dst: /etc/pam.d/ptscry
+    type: config|noreplace
+    file_info: {mode: 0644}
+  - src: contrib/logrotate.d/ptscry
+    dst: /etc/logrotate.d/ptscry
+    type: config|noreplace
+    file_info: {mode: 0644}
+  - src: ${PKG_STAGE}/man/ptscry.1.gz
+    dst: /usr/share/man/man1/ptscry.1.gz
+    file_info: {mode: 0644}
+  - src: ${PKG_STAGE}/man/ptscry-tui.1.gz
+    dst: /usr/share/man/man1/ptscry-tui.1.gz
+  - src: ${PKG_STAGE}/man/ptscry.conf.5.gz
+    dst: /usr/share/man/man5/ptscry.conf.5.gz
+    file_info: {mode: 0644}
+  - src: ${PKG_STAGE}/doc/
+    dst: /usr/share/doc/ptscry/
+    type: tree
+scripts:
+  postinstall: install/server/postinst.sh
+  preremove: install/server/prerm.sh
+  postremove: install/server/postrm.sh

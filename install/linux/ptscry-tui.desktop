@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=ptscry-tui
+GenericName=Terminal multiplexer (text)
+GenericName[it]=Multiplexer di terminale (testo)
+Comment=ptscry sessions in panes on a text terminal - Guido Cauli <guido.cauli@gmail.com>
+Comment[it]=Sessioni ptscry in pannelli su un terminale di testo - Guido Cauli <guido.cauli@gmail.com>
+TryExec=/usr/lib/ptscry-gui/ptscry-tui
+Exec=/usr/lib/ptscry-gui/ptscry-tui
+Icon=ptscry-gui
+Terminal=true
+Categories=System;TerminalEmulator;
+Keywords=terminal;terminale;tmux;panes;pannelli;session;sessione;multiplexer;

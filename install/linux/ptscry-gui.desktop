@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=ptscry-gui
+GenericName=Terminal multiplexer
+GenericName[it]=Multiplexer di terminale
+Comment=Persistent terminal sessions, local and remote - Guido Cauli <guido.cauli@gmail.com>
+Comment[it]=Sessioni di terminale persistenti, locali e remote - Guido Cauli <guido.cauli@gmail.com>
+TryExec=/usr/lib/ptscry-gui/ptscry-gui
+Exec=/usr/lib/ptscry-gui/ptscry-gui
+Icon=ptscry-gui
+Terminal=false
+Categories=System;TerminalEmulator;
+Keywords=terminal;terminale;ssh;session;sessione;multiplexer;
+StartupWMClass=ptscry-gui
