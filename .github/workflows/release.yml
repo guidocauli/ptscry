@@ -1,0 +1,136 @@
+# ptscry - Guido Cauli <guido.cauli@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Release: on a tag v* (git tag v0.7.1 && git push origin v0.7.1), or by hand
+# from the Actions tab with a tag name. Builds every package and attaches it
+# to a DRAFT release: nothing is published until you press "Publish".
+#   server:  deb / rpm / tar, amd64 and arm64 (Debian 11 container: glibc 2.31,
+#            so the binaries run on RHEL/Alma 9 and Debian 11+)
+#   GUI:     Linux deb / rpm / tar, Windows setup + zip (amd64, arm64), macOS dmg
+#   sources: tar.gz of the tag
+# The release notes come from docs/release-notes/<tag>.md when it exists.
+
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "tag of the release (created on the chosen branch if missing)"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: server + GUI Linux/Windows
+    runs-on: ubuntu-latest
+    container: debian:11
+    steps:
+      - name: build tools
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+            ca-certificates git curl tar gzip xz-utils python3 binutils file nsis \
+            gcc libc6-dev gcc-aarch64-linux-gnu libc6-dev-arm64-cross pkg-config \
+            libwayland-dev libxkbcommon-dev libx11-xcb-dev libxkbcommon-x11-dev libx11-dev \
+            libxcursor-dev libxfixes-dev libegl1-mesa-dev libvulkan-dev
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: nfpm
+        run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.41.1
+      - name: vet
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          go vet ./... && (cd tui && go vet .)
+      - name: server packages
+        run: PATH="$PATH:$(go env GOPATH)/bin" ./build-server.sh
+      - name: GUI packages (Linux, Windows)
+        run: PATH="$PATH:$(go env GOPATH)/bin" ./build-gui.sh linux windows
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: |
+            dist-server/*.deb
+            dist-server/*.rpm
+            dist-server/*.tar.gz
+            dist-gui/*.deb
+            dist-gui/*.rpm
+            dist-gui/*.tar.gz
+            dist-gui/*.zip
+            dist-gui/*.exe
+          if-no-files-found: error
+
+  macos:
+    name: GUI macOS (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            arch: arm64
+          - os: macos-15-intel
+            arch: amd64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: GUI package (macOS)
+        run: ./build-gui.sh macos
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}
+          path: |
+            dist-gui/*.dmg
+            dist-gui/*.tar.gz
+          if-no-files-found: error
+
+  release:
+    name: draft release
+    needs: [linux, macos]
+    if: ${{ !cancelled() && needs.linux.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: art
+          merge-multiple: true
+      - name: sources, checksums, notes
+        id: prep
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          mkdir -p out
+          find art -type f -exec cp {} out/ \;
+          git archive --format=tar.gz --prefix=ptscry/ -o "out/ptscry-${TAG#v}-src.tar.gz" HEAD
+          (cd out && sha256sum * > SHA256SUMS)
+          if [ -f "docs/release-notes/$TAG.md" ]; then
+            cp "docs/release-notes/$TAG.md" notes.md
+          else
+            printf '**%s** - Guido Cauli <guido.cauli@gmail.com>\n\nSoftware fornito "cosi'"'"' com'"'"'e'"'"'", **senza alcuna garanzia**: vedi LICENSE e NOTICE.md.\n' "$TAG" > notes.md
+          fi
+          ls -la out
+      - name: draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.prep.outputs.tag }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" out/* --clobber
+          else
+            gh release create "$TAG" out/* --draft --target "${{ github.sha }}" \
+              --title "ptscry $TAG" --notes-file notes.md
+          echo "draft ready: ${{ github.server_url }}/${{ github.repository }}/releases"
+          fi

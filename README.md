@@ -124,6 +124,12 @@ Un solo modulo, un solo `package main`, separato per piattaforma con i build tag
 - **Solo Linux** (`//go:build linux`): tutto il resto, cioe' client locale, monitor, host, launcher PAM, front-end SSH,
   seccomp, audit. `make cross` verifica che la parte comune compili per macOS e Windows.
 
+## Release
+
+`git tag vX.Y.Z && git push origin vX.Y.Z` (o **Actions → release → Run workflow**) avvia `.github/workflows/release.yml`:
+compila su GitHub server (deb/rpm/tar amd64 e arm64), GUI (Linux, setup Windows amd64/arm64, dmg macOS) e sorgenti, e li
+allega a una **bozza** di release, da pubblicare a mano. Le note vengono da `docs/release-notes/<tag>.md`.
+
 ## Licenza ed esclusione di responsabilita'
 
 Copyright (C) 2026 Guido Cauli <guido.cauli@gmail.com>. ptscry, ptscry-gui e ptscry-tui sono software libero
