@@ -367,17 +367,47 @@ func (g *gui) windowOptions() []gioapp.Option {
 		w, h = 980, 620
 	}
 	opts := []gioapp.Option{gioapp.Title("ptscry"), gioapp.Size(unit.Dp(w), unit.Dp(h)), gioapp.MinSize(unit.Dp(160), unit.Dp(80))}
-	switch g.set.Decorations {
+	frameless, mode := g.decorationsWanted()
+	g.frameless = frameless
+	gioapp.InitialDecorationMode = mode
+	return append(opts, gioapp.Decorated(!frameless))
+}
+
+// decorationsWanted: whether the window has no title bar (frameless: then
+// the tab bar has the window buttons and moves the window) and what to ask a
+// Wayland compositor.
+//   - "off":  no bar, and the compositor is asked not to draw one.
+//   - "on":   always a bar. On Wayland the program draws it (client-side):
+//     some compositors (Niri with prefer-no-csd) accept to decorate and then
+//     draw nothing, so asking them is not enough. On X11 the window manager.
+//   - "auto": none with a tiling compositor (it manages the frame), otherwise
+//     the compositor's choice.
+func (g *gui) decorationsWanted() (frameless bool, mode int) {
+	g.setMu.Lock()
+	d := g.set.Decorations
+	g.setMu.Unlock()
+	if !tilingPossible {
+		return false, gioapp.DecorationAuto
+	}
+	switch d {
 	case "off":
-		g.frameless = true
-	case "auto":
-		// A tiling compositor manages the frame itself: no bar of ours inside the tile.
-		g.frameless = tilingWM()
+		return true, gioapp.DecorationClient
+	case "on":
+		return false, gioapp.DecorationClient
 	}
-	if g.frameless {
-		opts = append(opts, gioapp.Decorated(false))
+	if tilingWM() {
+		return true, gioapp.DecorationClient
 	}
-	return opts
+	return false, gioapp.DecorationAuto
+}
+
+// applyDecorations puts the title bar setting into effect now.
+func (g *gui) applyDecorations() {
+	frameless, mode := g.decorationsWanted()
+	g.frameless = frameless
+	g.win.SetDecorationMode(mode)
+	g.win.Option(gioapp.Decorated(!frameless))
+	g.invalidate()
 }
 
 func (g *gui) run(win *gioapp.Window) error {
@@ -977,7 +1007,8 @@ func (d *settingsDialog) Layout(gtx layout.Context, g *gui) layout.Dimensions {
 		}
 		g.saveWorkspace()
 		g.closeDialog()
-		g.flashInfo("impostazioni salvate (la barra del titolo cambia al riavvio)")
+		g.applyDecorations()
+		g.flashInfo("impostazioni salvate")
 	}
 	kids := []layout.FlexChild{
 		g.row(gtx, g.label("Dimensione del carattere")), g.row(gtx, g.field(&d.font, "14")),

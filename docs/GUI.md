@@ -198,7 +198,15 @@ condividono il file: vale quello dell'ultima che si chiude.
 La GUI parla direttamente con Wayland (xdg-shell) e X11. Su Niri, Hyprland, Sway, i3 e simili rileva il window manager
 (`NIRI_SOCKET`, `HYPRLAND_INSTANCE_SIGNATURE`, `SWAYSOCK`, `XDG_CURRENT_DESKTOP`...) e toglie la propria barra del titolo, che
 il compositor gestisce da se': la finestra riempie la tassella e i tab, il menu e le righe/colonne seguono ogni ridimensionamento,
-comunicato anche al server (`stty size`). Su Linux la barra del titolo si regola nelle impostazioni (automatica, sempre, mai; su Windows e macOS c'e' sempre quella di sistema e le due opzioni non compaiono); i pulsanti riduci/ingrandisci/chiudi nella barra dei tab ("solo senza barra del titolo", sempre, mai) pure, e si applicano subito.
+comunicato anche al server (`stty size`). Su Linux la barra del titolo si regola nelle impostazioni e cambia subito:
+**automatica** (nessuna con un gestore a tasselli, altrimenti quella che sceglie il compositor), **sempre** (su Wayland la
+disegna il programma: alcuni compositor, come Niri con `prefer-no-csd`, accettano di decorare la finestra e poi non
+disegnano niente), **mai**. Su Windows e macOS c'e' sempre quella di sistema e le opzioni non compaiono. I pulsanti
+riduci/ingrandisci/chiudi nella barra dei tab ("solo senza barra del titolo", sempre, mai) si applicano subito anche loro.
+
+Ingrandire: pulsante, menu Finestra o doppio clic sulla barra (del titolo o dei tab). La finestra prende lo stato che
+il compositor dichiara: se non la ingrandisce (gestori a tasselli; Niri lo fa dalla 25.11, prima ci sono `Mod+F` per
+allargare la colonna e `Mod+Maiusc+F` per lo schermo intero) un messaggio lo dice.
 L'identificativo dell'applicazione (`app_id`) e', di norma, il nome del file (`ptscry-gui`), utile per le regole di finestra.
 
 La scala viene dal sistema: scala dello schermo Wayland, `Xft.dpi` su X11 e, su GNOME, `text-scaling-factor`. La dimensione del

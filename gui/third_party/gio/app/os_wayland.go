@@ -216,6 +216,7 @@ type window struct {
 	config       Config
 	wsize        image.Point // window config size before going fullscreen or maximized
 	inCompositor bool        // window is moving or being resized
+	lastMovePress time.Time // ptscry-gui patch: double click on the move area
 
 	clipReads chan transfer.DataEvent
 
@@ -418,6 +419,9 @@ func (d *wlDisplay) createNativeWindow(options []Option) (*window, error) {
 	if d.decor != nil {
 		w.decor = C.zxdg_decoration_manager_v1_get_toplevel_decoration(d.decor, w.topLvl)
 		C.zxdg_toplevel_decoration_v1_add_listener(w.decor, &C.gio_zxdg_toplevel_decoration_v1_listener, unsafe.Pointer(w.surf))
+		if InitialDecorationMode != DecorationAuto {
+			w.setDecorationMode(InitialDecorationMode)
+		}
 	}
 	w.updateOpaqueRegion()
 	return w, nil
@@ -584,9 +588,52 @@ func gio_onToplevelClose(data unsafe.Pointer, topLvl *C.struct_xdg_toplevel) {
 //export gio_onToplevelConfigure
 func gio_onToplevelConfigure(data unsafe.Pointer, topLvl *C.struct_xdg_toplevel, width, height C.int32_t, states *C.struct_wl_array) {
 	w := callbackLoad(data).(*window)
+	// ptscry-gui patch: the window takes the mode the compositor says it is
+	// in (maximized, fullscreen), not the one it asked for: a compositor may
+	// refuse a request (a tiling one, an old Niri) or change the mode on its
+	// own (a key of the compositor, a double click on its title bar).
+	mode := Windowed
+	if states != nil && states.size > 0 && states.data != nil {
+		for _, st := range unsafe.Slice((*uint32)(states.data), int(states.size)/4) {
+			switch st {
+			case C.XDG_TOPLEVEL_STATE_FULLSCREEN:
+				mode = Fullscreen
+			case C.XDG_TOPLEVEL_STATE_MAXIMIZED:
+				if mode != Fullscreen {
+					mode = Maximized
+				}
+			}
+		}
+	}
+	prev := w.config.Mode
 	if width != 0 && height != 0 {
 		w.size = image.Pt(int(width), int(height))
 		w.updateOpaqueRegion()
+	} else if mode == Windowed && (prev == Maximized || prev == Fullscreen) && w.wsize != (image.Point{}) {
+		w.size = w.wsize.Div(w.scale) // back to the size it had
+	}
+	if prev != Minimized && mode != prev {
+		if prev == Windowed {
+			w.wsize = w.config.Size
+		}
+		w.config.Mode = mode
+		w.ProcessEvent(ConfigEvent{Config: w.config})
+	}
+}
+
+// setDecorationMode asks the compositor who draws the title bar
+// (ptscry-gui patch, see SetDecorationMode).
+func (w *window) setDecorationMode(m int) {
+	if w.decor == nil {
+		return
+	}
+	switch m {
+	case DecorationClient:
+		C.zxdg_toplevel_decoration_v1_set_mode(w.decor, C.ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE)
+	case DecorationServer:
+		C.zxdg_toplevel_decoration_v1_set_mode(w.decor, C.ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE)
+	default:
+		C.zxdg_toplevel_decoration_v1_unset_mode(w.decor)
 	}
 }
 
@@ -939,9 +986,23 @@ func gio_onPointerButton(data unsafe.Pointer, p *C.struct_wl_pointer, serial, t,
 			return
 		}
 		act, ok := w.w.ActionAt(w.lastPos)
-		if ok && w.config.Mode == Windowed {
-			switch act {
-			case system.ActionMove:
+		if ok && act == system.ActionMove {
+			// ptscry-gui patch: a double click on the bar maximizes or
+			// restores, as on a title bar; a single press moves (only a
+			// window that is not maximized). The move starts at once, so the
+			// second click would never reach the program: it is caught here.
+			now := time.Now()
+			if now.Sub(w.lastMovePress) < 400*time.Millisecond {
+				w.lastMovePress = time.Time{}
+				if w.config.Mode == Maximized {
+					w.Configure([]Option{Windowed.Option()})
+				} else if w.config.Mode == Windowed {
+					w.Configure([]Option{Maximized.Option()})
+				}
+				return
+			}
+			w.lastMovePress = now
+			if w.config.Mode == Windowed {
 				w.move(serial)
 				return
 			}

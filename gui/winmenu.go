@@ -63,11 +63,26 @@ func (g *gui) showWindowButtons() bool {
 }
 
 func (g *gui) toggleMaximize() {
+	want := gioapp.Maximized
 	if g.mode == gioapp.Maximized {
+		want = gioapp.Windowed
 		g.win.Perform(system.ActionUnmaximize)
 	} else {
 		g.win.Perform(system.ActionMaximize)
 	}
+	// the compositor has the last word (the window takes the mode it reports):
+	// say so when it did not do it, instead of a button that does nothing
+	time.AfterFunc(1200*time.Millisecond, func() {
+		g.runOnUI(func() {
+			if want == gioapp.Maximized && g.mode != gioapp.Maximized {
+				msg := "il gestore delle finestre non ha ingrandito la finestra"
+				if tilingWM() {
+					msg += " (Niri lo fa dalla 25.11; prima: Mod+F allarga la colonna, Mod+Maiusc+F schermo intero)"
+				}
+				g.flash("%s", msg)
+			}
+		})
+	})
 }
 
 func (g *gui) toggleFullscreen() {
