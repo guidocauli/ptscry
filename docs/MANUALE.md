@@ -319,7 +319,10 @@ e' in `contrib/client.conf` (dove sta il file: cap. 4.1).
 
 ### 3.4 Solo per prove (standalone)
 `PTSCRY_STANDALONE=1 ptscry new`: nessun monitor, nessun privilegio. **Non** e' a prova di manomissione
-(l'utente scrive il proprio audit): usalo solo per sviluppo.
+(l'utente scrive il proprio audit): usalo solo per sviluppo. E' anche la modalita' "senza server" di ptscry-gui.
+In questa modalita' `ptscry check` controlla un'installazione per un solo utente: binario e configurazione possono essere
+dell'utente (per esempio in `~/.local`), purche' non siano modificabili da altri; poi la cartella delle sessioni (0700),
+l'host e il registro di audit (senza catena di hash).
 
 ## 4. Uso quotidiano
 

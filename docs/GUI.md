@@ -331,6 +331,10 @@ dice perché.
 | Amministrazione | utente e sessione in alto; Sessioni di tutti, Verifica l'audit, Verifica l'utente (`check -u`); Registra il TOTP, Termina una sua sessione, Ferma il suo host; Sostituisci il monitor (`admin reexec`) | server locale, con root o `admin_group` |
 | Servizio | Stato del servizio; Avvia, Rileggi la config, Riavvia, Ferma (`systemctl ... ptscry-monitor`, senza root con `pkexec`) | server locale, Linux |
 
+**Verifica** (`ptscry check`) per le sessioni senza server controlla un'installazione per un solo utente: binario e
+configurazione possono essere dell'utente (installazione in `~/.local`), purché nessun altro possa modificarli; poi la cartella
+delle sessioni (0700), l'host e il registro di audit (dell'utente, senza la catena di hash del monitor di root).
+
 Nelle schede Host, Amministrazione e Servizio ogni azione è una riga: il pulsante e, accanto, cosa fa. Le azioni che
 fermano o cancellano qualcosa sono rosse, stanno separate e chiedono conferma in una finestra che dice cosa succede e dove.
 Il **Risultato** (in basso, sempre visibile) mostra il comando eseguito e quello che ha scritto; *Copia*, *Pulisci*. Le

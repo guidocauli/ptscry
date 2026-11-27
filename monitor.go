@@ -230,6 +230,21 @@ func (m *monitor) allowRate(uid int, perSec, burst float64) (ok bool, note int) 
 // rename or remove root's entries there), and so is a group-writable one
 // whose group has no members (Debian's /usr/local is root:staff 2775).
 func checkTrusted(path string, mustExist bool) error {
+	return checkTrustedBy(path, mustExist, 0)
+}
+
+// checkTrustedBy is checkTrusted with more acceptable owners: for a
+// single-user installation (standalone mode, no root monitor) the user's own
+// files are as trusted as root's, as long as nobody else can change them.
+func checkTrustedBy(path string, mustExist bool, owners ...uint32) error {
+	ownerOK := func(uid uint32) bool {
+		for _, o := range owners {
+			if uid == o {
+				return true
+			}
+		}
+		return false
+	}
 	real, err := filepath.EvalSymlinks(path)
 	if err != nil {
 		if os.IsNotExist(err) && !mustExist {
@@ -243,8 +258,11 @@ func checkTrusted(path string, mustExist bool) error {
 			return err
 		}
 		st, ok := fi.Sys().(*syscall.Stat_t)
-		if !ok || st.Uid != 0 {
-			return fmt.Errorf("%s is not owned by root", p)
+		if !ok || !ownerOK(st.Uid) {
+			if len(owners) == 1 && owners[0] == 0 {
+				return fmt.Errorf("%s is not owned by root", p)
+			}
+			return fmt.Errorf("%s is owned by uid %d (only root or you should own it)", p, st.Uid)
 		}
 		perm := fi.Mode().Perm()
 		sticky := fi.IsDir() && fi.Mode()&os.ModeSticky != 0

@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"path/filepath"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -100,6 +101,11 @@ func cmdCheck(args []string) error {
 	}
 	d := &doctor{color: wantColor(*colorMode)}
 	fmt.Printf("# %s\n", versionLine())
+	if standalone() {
+		// a single-user installation (ptscry-gui "senza server", ~/.local): no
+		// root monitor, so not the checks of a server
+		return checkStandalone(d)
+	}
 	if os.Getuid() != 0 {
 		d.warnf("-", "not running as root: the checks on files, PAM and sshd are incomplete")
 	}
@@ -538,4 +544,74 @@ func localDialAddr(listen string) string {
 		host = "127.0.0.1"
 	}
 	return net.JoinHostPort(host, port)
+}
+
+// checkStandalone: `ptscry check` in standalone mode (PTSCRY_STANDALONE=1, as
+// ptscry-gui runs it for "senza server"): the sessions of this user only, a
+// per-user host instead of the root monitor. The binary and the configuration
+// may belong to the user (an installation in ~/.local), but nobody else may be
+// able to change them, nor read the sessions and the audit.
+func checkStandalone(d *doctor) error {
+	uid := os.Getuid()
+	d.info("standalone mode: sessions of this user only, no root monitor (installation for one user)")
+	if uid == 0 {
+		d.warnf("A.8.2", "standalone mode as root: use the server (root monitor) for root sessions")
+	}
+	me := uint32(uid)
+	if exe, err := os.Executable(); err == nil {
+		if err := checkTrustedBy(exe, true, 0, me); err != nil {
+			d.bad("A.8.9", "binary: "+err.Error())
+		} else {
+			d.ok("A.8.9", "binary "+exe+" is owned by root or by you, and not writable by others")
+		}
+	}
+	cpath := configPath()
+	cfg, u, err := loadEnv()
+	if err != nil {
+		d.bad("A.8.9", "configuration "+cpath+": "+err.Error())
+		return summarize(d)
+	}
+	if _, err := os.Stat(cpath); err != nil {
+		d.info("configuration " + cpath + " not found: the defaults apply")
+	} else if err := checkTrustedBy(cpath, true, 0, me); err != nil {
+		d.bad("A.8.9", "configuration: "+err.Error())
+	} else {
+		d.ok("A.8.9", "configuration "+cpath+" is owned by root or by you, and not writable by others")
+	}
+	dir := resolveSocketDir(&cfg, uid)
+	if fi, err := os.Stat(dir); err != nil {
+		d.info("session directory " + dir + " not created yet (the first session creates it)")
+	} else if st, ok := fi.Sys().(*syscall.Stat_t); !ok || st.Uid != me || fi.Mode().Perm()&0o077 != 0 {
+		d.bad("A.5.15", fmt.Sprintf("session directory %s must be yours with mode 0700 (it is %v)", dir, fi.Mode().Perm()))
+	} else {
+		d.ok("A.5.15", "session directory "+dir+" is yours, mode 0700")
+	}
+	if c, err := net.DialTimeout("unix", filepath.Join(dir, "host.sock"), 2*time.Second); err == nil {
+		c.Close()
+		d.ok("A.8.15", "host running ("+filepath.Join(dir, "host.sock")+")")
+	} else {
+		d.info("host not running: it starts with the first session")
+	}
+	ap := cfg.AuditLog
+	if ap == "" {
+		ap = defaultAuditPath(uid, u.HomeDir)
+	}
+	switch fi, err := os.Stat(ap); {
+	case ap == "off":
+		d.warnf("A.8.15", "audit_log = off: the sessions are not recorded")
+	case err != nil:
+		d.info("audit log " + ap + " not created yet")
+	case fi.Mode().Perm()&0o007 != 0:
+		d.bad("A.8.15", fmt.Sprintf("audit log %s is readable/writable by others (%v)", ap, fi.Mode().Perm()))
+	default:
+		d.ok("A.8.15", fmt.Sprintf("audit log %s mode %v", ap, fi.Mode().Perm()))
+	}
+	// the hash chain is the root monitor's: the per-user host writes plain records
+	d.info("in standalone mode the audit is the user's own, without the hash chain: for evidence others can rely on, use the server (root monitor)")
+	if s := readTrim("/proc/sys/kernel/yama/ptrace_scope"); s == "0" {
+		d.warnf("A.8.9", "kernel.yama.ptrace_scope = 0 (set >= 1: protects the audit data held by the host)")
+	} else if s != "n/a" {
+		d.ok("A.8.9", "kernel.yama.ptrace_scope = "+s)
+	}
+	return summarize(d)
 }
