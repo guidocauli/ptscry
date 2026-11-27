@@ -10,6 +10,7 @@ Manuale di amministrazione (installazione, scenari, **audit: conservazione e ana
 [docs/MANUALE.md](docs/MANUALE.md); man page: `man ptscry`, `man ptscry.conf`.
 Integrazione con Wazuh ed Elastic/Kibana: [docs/SIEM.md](docs/SIEM.md).
 Modello di sicurezza e mappatura ISO/IEC 27001:2022 in [docs/ISO27001.md](docs/ISO27001.md).
+Analisi red team (attacchi eseguiti, problemi corretti, rischi residui): [docs/REDTEAM.md](docs/REDTEAM.md).
 
 ## In breve
 

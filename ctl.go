@@ -19,6 +19,7 @@ import (
 	"os"
 	"sync"
 	"syscall"
+	"time"
 )
 
 const (
@@ -49,9 +50,25 @@ const (
 type ctlConn struct {
 	c   *net.UnixConn
 	wmu sync.Mutex
+	// wait: how long a send may block (0 = no limit). The monitor sets it for
+	// the hosts: a host is a process of the user, who can stop it (SIGSTOP);
+	// no root goroutine must wait on it for ever.
+	wait time.Duration
 }
 
 func newCtlConn(c *net.UnixConn) *ctlConn { return &ctlConn{c: c} }
+
+// newHostCtl is the monitor's end of a host's control socket.
+func newHostCtl(c *net.UnixConn) *ctlConn { return &ctlConn{c: c, wait: hostCtlWait} }
+
+// hostCtlWait limits the monitor's sends to a host.
+const hostCtlWait = 10 * time.Second
+
+func (c *ctlConn) deadline() {
+	if c.wait > 0 {
+		_ = c.c.SetWriteDeadline(time.Now().Add(c.wait))
+	}
+}
 
 func ctlBuf(t byte, payload []byte) ([]byte, error) {
 	if len(payload)+1 > ctlMaxMsg {
@@ -70,6 +87,7 @@ func (c *ctlConn) send(t byte, payload []byte) error {
 	}
 	c.wmu.Lock()
 	defer c.wmu.Unlock()
+	c.deadline()
 	_, err = c.c.Write(buf)
 	return err
 }
@@ -86,6 +104,7 @@ func (c *ctlConn) sendFD(t byte, payload []byte, f *os.File) error {
 		oob = syscall.UnixRights(int(fd))
 		c.wmu.Lock()
 		defer c.wmu.Unlock()
+		c.deadline()
 		_, _, rerr = c.c.WriteMsgUnix(buf, oob, nil)
 		return rerr
 	}); err != nil {

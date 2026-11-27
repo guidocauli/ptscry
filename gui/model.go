@@ -13,6 +13,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
@@ -87,6 +89,7 @@ func newTermModel(cols, rows, scrollback int, send func([]byte)) *termModel {
 	m.em.SetCallbacks(vt.Callbacks{
 		Bell: func() { m.bellNow() },
 		Title: func(t string) {
+			t = cleanTitle(t)
 			m.title = t
 			if m.onTitle != nil {
 				m.onTitle(t)
@@ -241,6 +244,19 @@ func (m *termModel) AltScreen() bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.em.IsAltScreen()
+}
+
+// cleanTitle is what a program may put in a tab and in the window title: one
+// line, no control or format characters (bidi overrides could make
+// "moc.knab" read as "bank.com"), at most 128 bytes.
+func cleanTitle(t string) string {
+	t = strings.Map(func(r rune) rune {
+		if r == utf8.RuneError || unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
+			return -1
+		}
+		return r
+	}, t)
+	return cleanLine(t, 128)
 }
 
 // Title is the title the program set.

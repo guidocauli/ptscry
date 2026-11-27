@@ -35,7 +35,7 @@ import (
 	"time"
 )
 
-var feUserRe = regexp.MustCompile(`^[A-Za-z0-9._@][A-Za-z0-9._@-]{0,63}$`)
+var feUserRe = regexp.MustCompile(`^[A-Za-z0-9_@][A-Za-z0-9._@-]{0,63}$`) // never "." or ".." (file names)
 
 const (
 	feTicketTTL    = 12 * time.Hour

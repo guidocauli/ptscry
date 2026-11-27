@@ -993,6 +993,10 @@ func adminSetupAllowed(g config, args []string, caller string) error {
 					}
 				}
 			}
+			// sudo rights given by name in sudoers (not through a group)
+			if sudoRights(t) {
+				return fmt.Errorf("%s may use sudo (sudoers): only root adds keys for them", t)
+			}
 		}
 		if part == "keys" && adding && t != caller && g.AdminGroup != "" {
 			if members, _, err := groupMembers(g.AdminGroup); err == nil && contains(members, t) {
@@ -1006,8 +1010,40 @@ func adminSetupAllowed(g config, args []string, caller string) error {
 	return nil
 }
 
-// privilegedGroups are the usual groups of those who may become root.
-var privilegedGroups = []string{"root", "sudo", "wheel", "admin", "adm"}
+// privilegedGroups are the usual groups of those who may become root, or who
+// can read or change what root owns (containers, disks, the password hashes).
+var privilegedGroups = []string{"root", "sudo", "wheel", "admin", "adm",
+	"docker", "lxd", "incus-admin", "libvirt", "disk", "shadow"}
+
+// sudoRights says whether sudoers gives the user anything at all ("sudo -l -U",
+// run by root). An error that is not "unknown user" counts as yes: when in
+// doubt the key stays root's to add.
+var sudoRights = func(name string) bool {
+	path, err := exec.LookPath("sudo")
+	if err != nil {
+		for _, p := range []string{"/usr/bin/sudo", "/bin/sudo"} {
+			if _, e := os.Stat(p); e == nil {
+				path = p
+			}
+		}
+		if path == "" {
+			return false // no sudo on this system
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, path, "-n", "-l", "-U", name)
+	cmd.Env = []string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL=C"}
+	out, err := cmd.CombinedOutput()
+	o := string(out)
+	if strings.Contains(o, "is not allowed to run sudo") {
+		return false
+	}
+	if err != nil && strings.Contains(o, "unknown user") {
+		return false
+	}
+	return true
+}
 
 // uidMin is UID_MIN of /etc/login.defs (1000 if missing): below are system accounts.
 func uidMin() int {

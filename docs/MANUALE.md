@@ -484,7 +484,9 @@ il monitor non apre percorsi per conto d'altri. Limiti per chi non e' root:
 
 - niente account di sistema: `-create`/`-shell` restano di root, e non si aggiungono utenti con UID sotto `UID_MIN`
   (`/etc/login.defs`, di solito 1000) ne' root;
-- niente chiavi per chi puo' diventare root (gruppi `root`, `sudo`, `wheel`, `admin`, `adm`) ne' per un altro amministratore
+- niente chiavi per chi puo' diventare root o leggere/cambiare cio' che e' di root: gruppi `root`, `sudo`, `wheel`, `admin`,
+  `adm`, `docker`, `lxd`, `incus-admin`, `libvirt`, `disk`, `shadow`, oppure qualunque diritto in sudoers (`sudo -l -U`),
+  ne' per un altro amministratore
   (solo per se stessi): una chiave permette a chi ha la privata di entrare **come quell'utente** dal front-end;
 - `~/.ssh/authorized_keys` (`-home`) si legge solo se e' un file dell'utente, non un collegamento;
 - togliere utenti e chiavi e' sempre possibile (non concede nulla).

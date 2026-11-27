@@ -519,7 +519,7 @@ func (m *monitor) resume(st *resumeFile) error {
 		}
 		proc, _ := os.FindProcess(rh.PID)
 		mh := &mhost{
-			m: m, uid: rh.UID, user: rh.User, pid: rh.PID, proc: proc, ctl: newCtlConn(conn), cfg: rh.Cfg,
+			m: m, uid: rh.UID, user: rh.User, pid: rh.PID, proc: proc, ctl: newHostCtl(conn), cfg: rh.Cfg,
 			gid: rh.GID, gids: rh.GIDs, home: rh.Home, shell: rh.Shell,
 			launches: map[string]*launch{}, sessions: map[string]*msess{},
 			reserved: map[uint64]time.Time{}, recs: map[string]*recorder{}, exited: make(chan struct{}),

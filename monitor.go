@@ -1037,7 +1037,7 @@ func (m *monitor) spawnHost(id *identity, cfg config, shell string) (*mhost, err
 
 	mh := &mhost{
 		m: m, uid: uid, user: id.u.Username, pid: cmd.Process.Pid, proc: cmd.Process,
-		ctl: newCtlConn(conn), cfg: cfg,
+		ctl: newHostCtl(conn), cfg: cfg,
 		gid: id.gid, gids: id.gids, home: id.u.HomeDir, shell: shell,
 		launches: map[string]*launch{},
 		sessions: map[string]*msess{}, reserved: map[uint64]time.Time{},
