@@ -213,8 +213,8 @@ mac_install() {
   <key>CFBundleExecutable</key><string>ptscry-gui</string>
   <key>CFBundleIconFile</key><string>ptscry-gui</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>${ver:-0.8.1-gui}</string>
-  <key>CFBundleVersion</key><string>${ver:-0.8.1-gui}</string>
+  <key>CFBundleShortVersionString</key><string>${ver:-0.9.0-gui}</string>
+  <key>CFBundleVersion</key><string>${ver:-0.9.0-gui}</string>
   <key>NSHumanReadableCopyright</key><string>Guido Cauli &lt;guido.cauli@gmail.com&gt;</string>
   <key>LSMinimumSystemVersion</key><string>10.13</string>
   <key>NSHighResolutionCapable</key><true/>

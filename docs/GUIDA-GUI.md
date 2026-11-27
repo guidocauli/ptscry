@@ -23,7 +23,11 @@ Il modo piu' semplice e' l'**installer** del proprio sistema:
 | macOS | `ptscry-gui-macos-ARCH.dmg` | si apre e si trascina ptscry-gui in Applicazioni |
 
 I pacchetti Linux mettono il programma in `/usr/lib/ptscry-gui`, il comando `ptscry-gui` in `/usr/bin`, la voce nel menu,
-le icone, la pagina di manuale (`man ptscry-gui`) e questa guida in `/usr/share/doc/ptscry-gui`.
+le icone, la pagina di manuale (`man ptscry-gui`) e questa guida in `/usr/share/doc/ptscry-gui`. Contengono anche il
+**server ptscry** completo (`ptscry`, `ptscry-tui`, monitor e unit `ptscry-monitor.service` non abilitata,
+`/etc/ptscry`, man page, `/usr/share/doc/ptscry`): non serve installare a parte il pacchetto `ptscry`, che viene
+sostituito se c'e'. Per usare il server su questa macchina (non serve alla GUI) si segue MANUALE.md capitolo 2.
+Su Windows e macOS il server non c'e' (il monitor e' solo per Linux): la GUI ha il client `ptscry`.
 
 In alternativa, senza privilegi, dagli archivi `.tar.gz` / `.zip`:
 

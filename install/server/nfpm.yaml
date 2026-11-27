@@ -20,9 +20,13 @@ description: |
 overrides:
   deb:
     depends: [libc6 (>= 2.34)]
+    # ptscry-gui contains the server: one or the other (its prerm keeps the monitor running)
+    conflicts: [ptscry-gui]
+    replaces: [ptscry-gui]
     recommends: [openssh-client, logrotate]
   rpm:
     depends: [glibc >= 2.34]
+    conflicts: [ptscry-gui]
     recommends: [openssh, logrotate]
 contents:
   - src: ${PKG_STAGE}/ptscry

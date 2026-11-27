@@ -1,6 +1,9 @@
 # ptscry-gui - Guido Cauli <guido.cauli@gmail.com>
 # .deb and .rpm packages, made by build-gui.sh with nfpm (https://nfpm.goreleaser.com):
 #   PKG_VERSION=0.7.5 PKG_ARCH=amd64 PKG_SRC=dist-gui/linux-amd64 nfpm package -f install/linux/nfpm.yaml -p deb
+# The package contains the ptscry server too (the files of install/server/nfpm.yaml,
+# staged by install/server/stage.sh in ${PKG_STAGE}): it takes the place of the
+# "ptscry" package, and the monitor keeps running when one replaces the other.
 name: ptscry-gui
 arch: ${PKG_ARCH}
 platform: linux
@@ -12,13 +15,22 @@ maintainer: Guido Cauli <guido.cauli@gmail.com>
 vendor: Guido Cauli
 license: AGPL-3.0-or-later
 description: |
-  Graphical multi-tab terminal with persistent ptscry sessions - Guido Cauli <guido.cauli@gmail.com>
+  Graphical multi-tab terminal with persistent ptscry sessions, and the ptscry server - Guido Cauli <guido.cauli@gmail.com>
   Every tab is a ptscry session that survives closing the window, on this
   computer (no server, no root) or on a remote ptscry server over SSH.
+  Includes the ptscry server (root monitor, per-user hosts, audit, SSH
+  front-end, systemd unit), the command-line client and ptscry-tui.
+provides:
+  - ptscry
 overrides:
   deb:
+    # Replaces without Conflicts: the files of "ptscry" pass to this package and
+    # "ptscry" disappears without running its removal script (which, up to 0.7.1,
+    # stops the monitor and so closes the sessions)
+    replaces: [ptscry]
+    recommends: [openssh-client, logrotate]
     depends:
-      - libc6
+      - libc6 (>= 2.34)
       - libegl1
       - libwayland-client0
       - libwayland-cursor0
@@ -30,7 +42,10 @@ overrides:
       - libxcursor1
       - libxfixes3
   rpm:
+    replaces: [ptscry] # = Obsoletes: dnf replaces the "ptscry" package by itself
+    recommends: [openssh, logrotate]
     depends:
+      - glibc >= 2.34
       # by library name: the package names differ between Fedora, Alma/RHEL and openSUSE
       - libEGL.so.1()(64bit)
       - libwayland-client.so.0()(64bit)
@@ -46,22 +61,59 @@ contents:
   - src: ${PKG_SRC}/ptscry-gui
     dst: /usr/lib/ptscry-gui/ptscry-gui
     file_info: {mode: 0755}
-  - src: ${PKG_SRC}/ptscry
-    dst: /usr/lib/ptscry-gui/ptscry
-    file_info: {mode: 0755}
-  - src: ${PKG_SRC}/ptscry-tui
-    dst: /usr/lib/ptscry-gui/ptscry-tui
-    file_info: {mode: 0755}
   - src: /usr/lib/ptscry-gui/ptscry-gui
     dst: /usr/bin/ptscry-gui
     type: symlink
+  # the server: the same files as the "ptscry" package
+  - src: ${PKG_SRC}/ptscry
+    dst: /usr/bin/ptscry
+    file_info: {mode: 0755}
+  - src: ${PKG_SRC}/ptscry-tui
+    dst: /usr/bin/ptscry-tui
+    file_info: {mode: 0755}
+  - src: /usr/bin/ptscry
+    dst: /usr/lib/ptscry-gui/ptscry
+    type: symlink
+  - src: /usr/bin/ptscry-tui
+    dst: /usr/lib/ptscry-gui/ptscry-tui
+    type: symlink
+  - src: install/server/ptscry-setup-frontend
+    dst: /usr/sbin/ptscry-setup-frontend
+    file_info: {mode: 0755}
+  - src: ${PKG_STAGE}/ptscry-monitor.service
+    dst: /usr/lib/systemd/system/ptscry-monitor.service
+    file_info: {mode: 0644}
+  - src: contrib/tmpfiles.d/ptscry.conf
+    dst: /usr/lib/tmpfiles.d/ptscry.conf
+    file_info: {mode: 0644}
+  - src: contrib/ptscry.conf
+    dst: /etc/ptscry/ptscry.conf
+    type: config|noreplace
+    file_info: {mode: 0644}
+  - src: ${PKG_PAM}
+    dst: /etc/pam.d/ptscry
+    type: config|noreplace
+    file_info: {mode: 0644}
+  - src: contrib/logrotate.d/ptscry
+    dst: /etc/logrotate.d/ptscry
+    type: config|noreplace
+    file_info: {mode: 0644}
+  - src: ${PKG_STAGE}/man/ptscry.1.gz
+    dst: /usr/share/man/man1/ptscry.1.gz
+    file_info: {mode: 0644}
+  - src: ${PKG_STAGE}/man/ptscry.conf.5.gz
+    dst: /usr/share/man/man5/ptscry.conf.5.gz
+    file_info: {mode: 0644}
+  - src: ${PKG_STAGE}/doc/
+    dst: /usr/share/doc/ptscry/
+    type: tree
   - src: install/linux/ptscry-gui.desktop
     dst: /usr/share/applications/ptscry-gui.desktop
     file_info: {mode: 0644}
   - src: install/linux/ptscry-tui.desktop
     dst: /usr/share/applications/ptscry-tui.desktop
     file_info: {mode: 0644}
-  - src: ${PKG_TUIMAN}
+  - src: ${PKG_STAGE}/man/ptscry-tui.1.gz
     dst: /usr/share/man/man1/ptscry-tui.1.gz
     file_info: {mode: 0644}
   - src: gui/assets/ptscry-gui.svg
@@ -82,7 +134,7 @@ contents:
     dst: /usr/share/icons/hicolor/256x256/apps/ptscry-gui.png
   - src: gui/assets/ptscry-gui-512.png
     dst: /usr/share/icons/hicolor/512x512/apps/ptscry-gui.png
-  - src: ${PKG_MAN}
+  - src: ${PKG_STAGE}/man/ptscry-gui.1.gz
     dst: /usr/share/man/man1/ptscry-gui.1.gz
     file_info: {mode: 0644}
   - src: docs/GUIDA-GUI.md
@@ -96,5 +148,12 @@ contents:
   - src: NOTICE.md
     dst: /usr/share/doc/ptscry-gui/NOTICE.md
 scripts:
-  postinstall: install/linux/postinst.sh
-  postremove: install/linux/postrm.sh
+  # made by build-gui.sh: the server's scripts followed by the menu/icon refresh
+  preinstall: install/linux/preinst.sh
+  postinstall: ${PKG_STAGE}/postinst.sh
+  preremove: ${PKG_STAGE}/prerm.sh
+  postremove: ${PKG_STAGE}/postrm.sh
+rpm:
+  scripts:
+    # after the replaced "ptscry" package is gone (its %preun, up to 0.7.1, stops the monitor)
+    posttrans: install/linux/posttrans.sh

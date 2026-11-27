@@ -60,17 +60,7 @@ build_arch() { # build_arch <goarch>
   case "$need" in GLIBC_2.3[5-9]|GLIBC_2.[4-9]*) fail "the $ARCH binary needs $need: it would not run on RHEL/Alma 9 (glibc 2.34)";; esac
 
   # files adapted to /usr/bin (the sources say /usr/local, as "make install")
-  sed -e 's|/usr/local/bin/ptscry|/usr/bin/ptscry|g; s|/usr/local/share/doc/ptscry|/usr/share/doc/ptscry|g' \
-    contrib/systemd/ptscry-monitor.service > "$STAGE/ptscry-monitor.service"
-  mkdir -p "$STAGE/man" "$STAGE/doc"
-  gzip -9n -c man/ptscry.1 > "$STAGE/man/ptscry.1.gz"
-  gzip -9n -c man/ptscry.conf.5 > "$STAGE/man/ptscry.conf.5.gz"
-  gzip -9n -c man/ptscry-tui.1 > "$STAGE/man/ptscry-tui.1.gz"
-  cp README.md LICENSE NOTICE.md docs/MANUALE.md docs/ISO27001.md docs/SIEM.md contrib/client.conf "$STAGE/doc/"
-  sed -e 's|/usr/local/bin/ptscry|/usr/bin/ptscry|g' contrib/sshd_config.d/50-ptscry.conf > "$STAGE/doc/sshd-50-ptscry.conf"
-  cp contrib/rsyslog.d/50-ptscry.conf "$STAGE/doc/rsyslog-50-ptscry.conf"
-  cp -r contrib/wazuh contrib/elastic contrib/pam.d "$STAGE/doc/"
-  chmod -R u=rwX,go=rX "$STAGE"
+  install/server/stage.sh "$STAGE"
 
   for f in deb rpm; do
     pam=contrib/pam.d/ptscry.debian; [ $f = rpm ] && pam=contrib/pam.d/ptscry.rhel

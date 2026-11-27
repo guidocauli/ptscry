@@ -134,7 +134,15 @@ build_one() { # build_one <goos> <goarch> <cgo> <gui-ldflags-extra> <ext>
   say "ptscry-gui $os/$arch (cgo=$cgo)"
   (cd gui && CGO_ENABLED=$cgo GOOS=$os GOARCH=$arch go build -trimpath -ldflags "$LDFLAGS $extra" -o "../$dir/ptscry-gui$ext" .)
   # the command-line client the "senza server" profile runs (not on Windows: no local host there)
-  if [ "$os" != windows ]; then
+  if [ "$os" = linux ]; then
+    # the same ptscry as the server packages (cgo: NSS/SSSD, PAM): the GUI packages contain the server
+    say "ptscry $os/$arch (server and client, cgo)"
+    CGO_ENABLED=1 GOOS=$os GOARCH=$arch go build -trimpath -ldflags "$LDFLAGS" -o "$dir/ptscry$ext" .
+    need=$(readelf -V "$dir/ptscry" 2>/dev/null | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -1 || true)
+    case "$need" in GLIBC_2.3[5-9]|GLIBC_2.[4-9]*) say "warning: ptscry needs $need: it will not run on RHEL/Alma 9 (glibc 2.34); the release builds on AlmaLinux 9" ;; esac
+    say "ptscry-tui $os/$arch (panes on a text terminal)"
+    (cd tui && CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath -ldflags "$LDFLAGS" -o "../$dir/ptscry-tui$ext" .)
+  elif [ "$os" != windows ]; then
     say "ptscry $os/$arch (static, standalone mode)"
     CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath -ldflags "$LDFLAGS" -o "$dir/ptscry$ext" .
     say "ptscry-tui $os/$arch (panes on a text terminal)"
@@ -150,21 +158,38 @@ pkgver() { printf '%s' "${VER_GUI%%-*}"; }
 
 nfpm_bin() { command -v nfpm 2>/dev/null || { [ -x "$(go env GOPATH)/bin/nfpm" ] && echo "$(go env GOPATH)/bin/nfpm"; } || true; }
 
-inst_linux() { # inst_linux <arch>
+# script_join <server script> <gui script> <out>: the server's script without its
+# final "exit 0", then the GUI's (without its first line); the message after a
+# first installation speaks of the GUI.
+script_join() {
+  { sed -e '$d' -e 's|^ptscry installed. Next:$|ptscry-gui installed, with the ptscry server (optional: the GUI works without it). To use the server:|' "$1"
+    [ -n "$2" ] && sed -e '1d' "$2" || echo "exit 0"; } > "$3"
+  chmod 0755 "$3"
+}
+
+inst_linux() { # inst_linux <arch>: .deb and .rpm, with the server
   [ "$PACK" = 1 ] && [ "$INST" = 1 ] || return 0
-  local arch=$1 nf man yaml f
+  local arch=$1 nf stage yaml f pam
   nf=$(nfpm_bin)
   if [ -z "$nf" ]; then say "no nfpm: skipping .deb/.rpm (go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest)"; return 0; fi
-  man=$(mktemp); yaml=$(mktemp)
-  gzip -9n -c man/ptscry-gui.1 > "$man"; chmod 0644 "$man"
-  tman=$(mktemp); gzip -9n -c man/ptscry-tui.1 > "$tman"; chmod 0644 "$tman"
-  sed -e "s|\${PKG_SRC}|$OUT/linux-$arch|g; s|\${PKG_MAN}|$man|g; s|\${PKG_TUIMAN}|$tman|g; s|\${PKG_VERSION}|$(pkgver)|g; s|\${PKG_ARCH}|$arch|g" \
-    install/linux/nfpm.yaml > "$yaml"
+  [ "$(tail -n1 install/server/postinst.sh)" = "exit 0" ] && [ "$(tail -n1 install/server/prerm.sh)" = "exit 0" ] && [ "$(tail -n1 install/server/postrm.sh)" = "exit 0" ] \
+    || fail "the server's package scripts must end with \"exit 0\""
+  stage=$(mktemp -d)
+  install/server/stage.sh "$stage"
+  script_join install/server/postinst.sh install/linux/postinst.sh "$stage/postinst.sh"
+  # deb: the restart of the monitor (rpm: %posttrans) at the end of postinst
+  sed -i '$d' "$stage/postinst.sh"; sed -e '1d' install/linux/posttrans.sh >> "$stage/postinst.sh"
+  script_join install/server/prerm.sh "" "$stage/prerm.sh"
+  script_join install/server/postrm.sh install/linux/postrm.sh "$stage/postrm.sh"
   for f in deb rpm; do
-    say "installer: .$f"
+    pam=contrib/pam.d/ptscry.debian; [ $f = rpm ] && pam=contrib/pam.d/ptscry.rhel
+    yaml="$stage/nfpm-$f.yaml"
+    sed -e "s|\${PKG_SRC}|$OUT/linux-$arch|g; s|\${PKG_STAGE}|$stage|g; s|\${PKG_PAM}|$pam|g; s|\${PKG_VERSION}|$(pkgver)|g; s|\${PKG_ARCH}|$arch|g" \
+      install/linux/nfpm.yaml > "$yaml"
+    say "installer: .$f (with the server)"
     "$nf" package -f "$yaml" -p "$f" -t "$OUT/" >/dev/null || fail "nfpm $f failed"
   done
-  rm -f "$man" "$yaml"
+  rm -rf "$stage"
 }
 
 inst_windows() { # inst_windows <arch>

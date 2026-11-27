@@ -1,6 +1,6 @@
 # ptscry - Guido Cauli <guido.cauli@gmail.com>
 
-# Manuale di amministrazione (versione 0.7.1)
+# Manuale di amministrazione (versione 0.7.2)
 
 Questo manuale e' per chi installa e gestisce ptscry. Per i comandi vedi `man ptscry`, per
 le chiavi di configurazione `man ptscry.conf`, per il modello di sicurezza e la mappatura
@@ -84,7 +84,7 @@ front-end, per i limiti e l'audit.
 
 ### 2.1 Con i pacchetti (consigliato)
 
-`./build-server.sh` (serve nfpm) produce in `dist-server/` i pacchetti del server, separati da quelli della GUI:
+`./build-server.sh` (serve nfpm) produce in `dist-server/` i pacchetti del server:
 
 | Sistema | Pacchetto | Comando |
 |---|---|---|
@@ -98,6 +98,13 @@ li' si compila sul posto con `make build`). Il pacchetto installa `/usr/bin/ptsc
 e documenti in `/usr/share/doc/ptscry` (snippet sshd, rsyslog, Wazuh, Elastic). Crea i gruppi `ptscry` e `ptscry-admins` se
 mancano e imposta `kernel.yama.ptrace_scope = 1` solo se il valore attuale e' piu' basso. **Non avvia e non riavvia mai il
 monitor** (un riavvio chiuderebbe le sessioni): dopo un aggiornamento si passa alla nuova versione con `ptscry admin reexec`.
+
+Il pacchetto **`ptscry-gui`** (deb/rpm) **contiene anche il server**: gli stessi file del pacchetto `ptscry` (monitor, unit
+systemd, configurazione, PAM, front-end SSH, `ptscry-tui`, man page e documenti) piu' la GUI. Si installa l'uno o l'altro:
+installando `ptscry-gui` su una macchina con `ptscry`, lo sostituisce (e viceversa); il monitor continua a girare.
+Eccezione: il pacchetto `ptscry` **0.7.0 o 0.7.1**, sostituito, ferma il monitor (e quindi chiude le sessioni) con il suo
+script di rimozione; `ptscry-gui` lo riabilita e lo riavvia subito. Su un server con sessioni aperte conviene prima aggiornare
+`ptscry` alla 0.7.2 o successiva (che non ferma nulla), poi passare a `ptscry-gui`.
 La configurazione e' conservata negli aggiornamenti e nella rimozione; i log e le registrazioni in `/var/log/ptscry` restano
 sempre (sono evidenze). Poi:
 

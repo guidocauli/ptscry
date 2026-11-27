@@ -23,7 +23,9 @@ make gui                  # solo ptscry-gui nella cartella corrente
 ```
 
 Con gli strumenti presenti, `build-gui.sh` prepara anche gli installer: `ptscry-gui-setup-windows-<arch>.exe` (NSIS, `apt install nsis`), `.deb` e `.rpm` (nfpm), `.dmg` (solo su un Mac); `-I` li salta. I pacchetti finiscono in `dist-gui/` (`ptscry-gui-linux-amd64.tar.gz`, `ptscry-gui-windows-amd64.zip`, `...-arm64.zip`,
-`SHA256SUMS`) e contengono `ptscry-gui`, il comando `ptscry` e la documentazione.
+`SHA256SUMS`) e contengono `ptscry-gui`, il comando `ptscry` e la documentazione. I `.deb` e `.rpm` contengono anche il
+**server** (gli stessi file del pacchetto `ptscry`, preparati da `install/server/stage.sh`) e sostituiscono il pacchetto
+`ptscry` (MANUALE.md 2.1); su Linux `ptscry` e' compilato con cgo come per il server.
 
 **Dipendenze di compilazione su Linux** (la GUI usa cgo per Wayland, X11 e OpenGL/Vulkan):
 

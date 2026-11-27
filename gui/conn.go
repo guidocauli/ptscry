@@ -21,7 +21,7 @@ import (
 	"ptscry/internal/rclient"
 )
 
-const guiVersion = "0.8.1-gui"
+const guiVersion = "0.9.0-gui"
 
 // hub holds the SSH connection of one profile.
 type hub struct {
