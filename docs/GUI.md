@@ -188,7 +188,7 @@ e l'ambiente, non i programmi. Finche' il server resta acceso, invece, tutto con
 ## 6. Impostazioni
 
 Dimensione e nome del carattere (a spaziatura fissa; vuoto = Go Mono incluso; i simboli mancanti li prende dai font di sistema; **Scegli dall'elenco...** mostra i font a spaziatura fissa installati (OpenType/TrueType: i font Type 1 e bitmap non si possono usare), con filtro e **anteprima** disegnata con il file del font stesso, quindi uguale su Linux, Windows e macOS; il font scelto viene caricato dal suo file, non cercato per nome; lo stesso elenco e' in **Vista → Scegli il carattere del terminale...**, che applica la scelta subito a tutti i tab),
-righe di scrollback (1000, 10000, 100000, illimitato = un milione), barra del titolo, profilo predefinito, comandi di avvio, riapertura dei tab.
+righe di scrollback (1000, 10000, 100000, illimitato = un milione), **cursore del terminale** (come lo chiede il programma, predefinito: forma blocco/sottolineato/barra e lampeggio con DECSCUSR, come vim o la shell; oppure sempre lampeggiante o sempre fisso, mantenendo la forma chiesta), barra del titolo, profilo predefinito, comandi di avvio, riapertura dei tab.
 Il file e' `~/.config/ptscry/gui.json` (Windows: `%AppData%\ptscry`, macOS: `~/Library/Application Support/ptscry`), permessi 0600.
 **Non contiene password ne' codici TOTP.** Le impostazioni non valide vengono corrette alla lettura. Piu' finestre aperte insieme
 condividono il file: vale quello dell'ultima che si chiude.

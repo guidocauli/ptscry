@@ -20,6 +20,8 @@ su uno pseudoterminale, con \fB\-H\fR un canale della stessa connessione SSH al 
 Chiudere un pannello o uscire stacca soltanto: le sessioni continuano.
 Senza sessioni apre \fBmain\fR; \fB\-l\fR apre una disposizione salvata con \fBptscry layout\fR o da ptscry-gui.
 \fB\-s\fR toglie la barra di stato, \fB\-m\fR non cattura il mouse (anche \fBstatus = off\fR, \fBmouse = off\fR in client.conf).
+Il cursore ha la forma e il lampeggio chiesti dal programma del pannello attivo (DECSCUSR); se non chiede niente resta quello
+del terminale. \fBcursor = blink\fR o \fBsteady\fR in client.conf forza il lampeggio.
 .SH TASTI (dopo il prefisso, Ctrl\-B o quello di client.conf)
 .TS
 l l.

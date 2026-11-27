@@ -109,6 +109,7 @@ type Conf struct {
 	Cert     string // SSH certificate file
 	Status   string // ptscry-tui: "on" / "off" (the status bar), "" = not set
 	Mouse    string // ptscry-tui: "on" / "off", "" = not set
+	Cursor   string // ptscry-tui: "app" / "blink" / "steady", "" = not set
 }
 
 // ReadConf reads the client.conf files, most specific first; for each
@@ -171,6 +172,15 @@ func ReadConf(paths []string, checkOwner bool) (cc Conf, warn []string) {
 				}
 				if *dst == "" {
 					*dst = v
+				}
+			case "cursor":
+				v = strings.ToLower(v)
+				if v != "app" && v != "blink" && v != "steady" {
+					warn = append(warn, fmt.Sprintf("%s:%d: cursor wants app, blink or steady", p, n))
+					continue
+				}
+				if cc.Cursor == "" {
+					cc.Cursor = v
 				}
 			case "status", "mouse":
 				v = strings.ToLower(v)

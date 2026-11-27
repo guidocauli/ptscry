@@ -47,6 +47,9 @@ type app struct {
 	detaching bool
 
 	lastOSCLayout time.Time
+
+	cursorMode string // client.conf "cursor": "" (as the program asks), "blink", "steady"
+	lastCursor int    // the DECSCUSR last sent to the terminal
 }
 
 type ctlReq struct {

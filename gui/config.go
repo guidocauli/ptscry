@@ -76,6 +76,7 @@ type settings struct {
 	MenuBar     string      `json:"menubar"`              // "on" (default) or "off": the drop-down menus along the top
 	WinButtons  string      `json:"win_buttons"`          // min/max/close in the tab bar: "auto" (no system bar), "on", "off"
 	StatusBar   string      `json:"status_bar,omitempty"` // the bar at the bottom: "on" (default) or "off"
+	Cursor      string      `json:"cursor,omitempty"`     // "" = as the program asks (DECSCUSR), "blink", "steady"
 	Default     string      `json:"default_profile"`
 	Profiles    []profile   `json:"profiles"`
 	Workspaces  []workspace `json:"workspaces,omitempty"`
@@ -148,6 +149,11 @@ func (s settings) sanitized() settings {
 	}
 	if s.Scrollback > scrollUnlimited {
 		s.Scrollback = scrollUnlimited
+	}
+	switch s.Cursor {
+	case "", "blink", "steady":
+	default:
+		s.Cursor = ""
 	}
 	switch s.Decorations {
 	case "auto", "on", "off":

@@ -43,11 +43,13 @@ func (a *app) render() {
 		if n := a.root.find(p); n != nil {
 			p.mu.Lock()
 			pos, hidden := p.em.CursorPosition(), p.em.CursorHidden()
+			shape, blink := p.em.CursorStyle()
 			p.mu.Unlock()
 			if !hidden && pos.X < n.rect.Dx() && pos.Y < n.rect.Dy() {
 				_ = a.scr.SetCursorPosition(n.rect.Min.X+pos.X, n.rect.Min.Y+pos.Y)
 				hide = false
 			}
+			a.cursorStyle(int(shape), blink)
 		}
 	}
 	if hide {
@@ -205,4 +207,29 @@ func prefixLabel(b byte) string {
 		return "Ctrl-" + string("[\\]^_"[b-0x1b])
 	}
 	return "prefix"
+}
+
+// cursorStyle gives the real terminal the cursor the program of the focused
+// pane asked for (DECSCUSR). A program that asked nothing (a blinking block,
+// the emulator's default) gets the terminal's own default (DECSCUSR 0), so
+// that the person's settings stay; client.conf "cursor" can force the blink.
+func (a *app) cursorStyle(shape int, blink bool) {
+	n := 0
+	if shape != 0 || !blink || a.cursorMode != "" {
+		switch a.cursorMode {
+		case "blink":
+			blink = true
+		case "steady":
+			blink = false
+		}
+		n = shape*2 + 1 // 1 block, 3 underline, 5 bar: blinking
+		if !blink {
+			n++
+		}
+	}
+	if n == a.lastCursor {
+		return
+	}
+	a.lastCursor = n
+	_, _ = a.scr.WriteString(fmt.Sprintf("\x1b[%d q", n))
 }

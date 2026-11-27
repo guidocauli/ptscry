@@ -55,6 +55,15 @@ type termModel struct {
 	onCtl   func([]string) // a request of the program to the GUI (OSC 7799); called under mu
 }
 
+// CursorShape is the cursor the program asked for (DECSCUSR): 0 block,
+// 1 underline, 2 bar, and whether it blinks.
+func (m *termModel) CursorShape() (shape int, blink bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	st, b := m.em.CursorStyle()
+	return int(st), b
+}
+
 // LastOutput is when the program last printed something.
 func (m *termModel) LastOutput() time.Time {
 	n := m.lastOut.Load()

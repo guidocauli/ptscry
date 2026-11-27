@@ -894,6 +894,7 @@ type settingsDialog struct {
 	face     widget.Editor
 	scroll   widget.Enum
 	deco     widget.Enum
+	cursor   widget.Enum
 	wbtn     widget.Enum
 	mbar     widget.Enum
 	uiscale  widget.Editor
@@ -929,6 +930,10 @@ func (g *gui) openSettingsDialog() {
 	}
 	d.startup.SetText(s.Startup)
 	d.deco.Value = s.Decorations
+	d.cursor.Value = s.Cursor
+	if d.cursor.Value == "" {
+		d.cursor.Value = "app"
+	}
 	d.wbtn.Value = s.WinButtons
 	d.def = newCombo("cerca la connessione…", "nessuna connessione")
 	var pitems []comboItem
@@ -979,6 +984,10 @@ func (d *settingsDialog) Layout(gtx layout.Context, g *gui) layout.Dimensions {
 			g.set.Scrollback, _ = strconv.Atoi(d.scroll.Value)
 		}
 		g.set.Decorations = d.deco.Value
+		g.set.Cursor = d.cursor.Value
+		if g.set.Cursor == "app" {
+			g.set.Cursor = ""
+		}
 		g.set.WinButtons = d.wbtn.Value
 		g.set.MenuBar = d.mbar.Value
 		if v, err := strconv.Atoi(strings.TrimSpace(d.uiscale.Text())); err == nil {
@@ -1042,6 +1051,22 @@ func (d *settingsDialog) Layout(gtx layout.Context, g *gui) layout.Dimensions {
 			)
 		}),
 		g.row(gtx, g.label("Connessione predefinita per i nuovi tab")),
+	}
+	{
+		at := len(kids) - 1
+		extra := []layout.FlexChild{
+			g.row(gtx, g.label("Cursore del terminale")),
+			g.row(gtx, func(gtx layout.Context) layout.Dimensions {
+				return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
+					layout.Rigid(material.RadioButton(g.th, &d.cursor, "app", "come chiede il programma").Layout),
+					layout.Rigid(layout.Spacer{Width: 10}.Layout),
+					layout.Rigid(material.RadioButton(g.th, &d.cursor, "blink", "lampeggiante").Layout),
+					layout.Rigid(layout.Spacer{Width: 10}.Layout),
+					layout.Rigid(material.RadioButton(g.th, &d.cursor, "steady", "fisso").Layout),
+				)
+			}),
+		}
+		kids = append(kids[:at], append(extra, kids[at:]...)...)
 	}
 	if tilingPossible {
 		// only where a tiling window manager may draw the frame (Linux, BSD):

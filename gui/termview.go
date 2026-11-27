@@ -56,15 +56,16 @@ type termView struct {
 	measuredPx float32
 	face       string // typeface chosen in the settings ("" = Go Mono)
 
-	focusTag  struct{}
-	focused   bool
-	lastClick time.Time
-	clicks    int
-	dragging  bool
-	sbDrag    bool
-	cursorOn  bool
-	cursorAt  time.Time
-	zoomAcc   float32
+	focusTag    struct{}
+	focused     bool
+	lastClick   time.Time
+	clicks      int
+	dragging    bool
+	sbDrag      bool
+	cursorOn    bool
+	cursorShape int // 0 block, 1 underline, 2 bar (set by the layout from the program's request)
+	cursorAt    time.Time
+	zoomAcc     float32
 
 	// the text sent to the program, from keys and paste
 	input func([]byte)
@@ -221,10 +222,17 @@ func (t *termView) paintCells(gtx layout.Context, pad int) {
 		}
 	}
 	// 2: the cursor under the text when it is a block
+	block := t.cursorShape == 0
 	if curVisible && curX < cols && curY < rows {
 		rect := image.Rect(pad+curX*t.cellW, pad+curY*t.cellH, pad+(curX+1)*t.cellW, pad+(curY+1)*t.cellH)
 		if t.focused {
 			if t.cursorOn {
+				switch t.cursorShape {
+				case 1: // underline
+					rect.Min.Y = rect.Max.Y - max(2, t.cellH/8)
+				case 2: // bar
+					rect.Max.X = rect.Min.X + max(2, t.cellW/6)
+				}
 				paint.FillShape(ops, theme.cursor, clip.Rect(rect).Op())
 			}
 		} else { // an empty box when the window has not the focus
@@ -241,7 +249,7 @@ func (t *termView) paintCells(gtx layout.Context, pad int) {
 				continue
 			}
 			style := cell.style
-			if curVisible && t.focused && t.cursorOn && c == curX && r == curY {
+			if block && curVisible && t.focused && t.cursorOn && c == curX && r == curY {
 				style.fg = theme.bg // text under a block cursor
 			}
 			if rs := []rune(cell.text); len(rs) == 1 && isBoxOrBlock(rs[0]) {
@@ -259,7 +267,7 @@ func (t *termView) paintCells(gtx layout.Context, pad int) {
 			for e < cols {
 				ce := grid[r*cols+e]
 				st := ce.style
-				if curVisible && t.focused && t.cursorOn && e == curX && r == curY {
+				if block && curVisible && t.focused && t.cursorOn && e == curX && r == curY {
 					st.fg = theme.bg
 				}
 				if ce.skip || ce.wide || st != style || (ce.text != "" && !isPlain(ce.text)) {

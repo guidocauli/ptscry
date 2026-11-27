@@ -141,6 +141,9 @@ func main() {
 
 	a := &app{be: be, prefix: prefix, status: !*noStatus && cc.Status != "off", mouse: !*noMouse && cc.Mouse != "off",
 		dirty: make(chan struct{}, 1), ctl: make(chan ctlReq, 16), gone: make(chan *pane, 16), quit: make(chan string, 1)}
+	if cc.Cursor == "blink" || cc.Cursor == "steady" {
+		a.cursorMode = cc.Cursor
+	}
 	a.t = uv.DefaultTerminal()
 	a.scr = a.t.Screen()
 	if err := a.t.Start(); err != nil {
@@ -162,6 +165,9 @@ func main() {
 	_ = a.scr.SetMouseMode(uv.MouseModeNone)
 	_ = a.scr.ExitAltScreen()
 	_ = a.scr.ShowCursor()
+	if a.lastCursor != 0 {
+		_, _ = a.scr.WriteString("\x1b[0 q") // the terminal's own cursor again
+	}
 	_ = a.scr.Flush()
 	_ = a.t.Stop()
 	for _, p := range a.panes() {

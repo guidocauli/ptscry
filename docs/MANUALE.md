@@ -423,7 +423,9 @@ Tasti dopo il prefisso: `%` e `"` dividono, frecce/`o`/`;` spostano, `Alt`/`Ctrl
 `Spazio` disposizioni pronte, `x` chiude (stacca), `S` input sincronizzato, `[` modalita' copia (ricerca con `/`,
 copia negli appunti del terminale con OSC 52), `W`/`O` salvano/aprono una disposizione sul server, `d` stacca tutto.
 Gli altri (`s ( ) L c $ f m M w`) arrivano al client della sessione del pannello. Barra di stato e mouse si tolgono con
-`-s`/`-m` o con `status = off` / `mouse = off` in client.conf. Dettagli: `man ptscry-tui`. Da dentro un pannello (anche
+`-s`/`-m` o con `status = off` / `mouse = off` in client.conf. Il cursore e' quello che chiede il programma del pannello attivo
+(forma e lampeggio, DECSCUSR) passato al terminale; se non chiede niente resta quello del terminale. `cursor = blink` o `steady`
+in client.conf forza il lampeggio. Dettagli: `man ptscry-tui`. Da dentro un pannello (anche
 nella GUI) `ptscry split [-v]` apre un pannello e `ptscry layout apply NOME` una disposizione.
 
 Si puo' cambiare in due modi:

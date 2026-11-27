@@ -562,8 +562,16 @@ func (g *gui) layoutPane(gtx layout.Context, l, t *tab, r image.Rectangle, inter
 	focus := t == l.focused()
 	v := t.view
 	v.focused = tg.Focused(&v.focusTag)
+	shape, blink := t.model.CursorShape()
+	v.cursorShape = shape
+	switch g.cursorMode() {
+	case "blink":
+		blink = true
+	case "steady":
+		blink = false
+	}
 	if interactive && focus {
-		v.cursorOn = time.Now().UnixMilli()/530%2 == 0 || time.Since(v.cursorAt) < 600*time.Millisecond
+		v.cursorOn = !blink || time.Now().UnixMilli()/530%2 == 0 || time.Since(v.cursorAt) < 600*time.Millisecond
 	} else if !focus {
 		v.cursorOn = true // a hollow cursor: the focus is elsewhere
 	}
@@ -1171,4 +1179,11 @@ func (t *tab) sessionName() string {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.session
+}
+
+// cursorMode: "" (as the program asks), "blink" or "steady".
+func (g *gui) cursorMode() string {
+	g.setMu.Lock()
+	defer g.setMu.Unlock()
+	return g.set.Cursor
 }
