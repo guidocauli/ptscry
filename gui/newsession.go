@@ -618,10 +618,19 @@ func (d *newSessionDialog) Layout(gtx layout.Context, g *gui) layout.Dimensions 
 
 // kindButton is one segment of the choice of the kind.
 func (d *newSessionDialog) kindButton(gtx layout.Context, g *gui, c *widget.Clickable, label string, on bool) layout.Dimensions {
+	return g.segButton(gtx, c, label, on, true)
+}
+
+// segButton is a button of a row of choices (pages, kinds); a dim one is
+// drawn grey (and its clicks are ignored by the caller).
+func (g *gui) segButton(gtx layout.Context, c *widget.Clickable, label string, on, enabled bool) layout.Dimensions {
 	return c.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 		bg, fg := theme.input, theme.chromeText
 		if on {
 			bg, fg = theme.accent, theme.accentFg
+		} else if !enabled {
+			fg = theme.disabled // not available here
+			fg.A = 0x80
 		} else if c.Hovered() {
 			bg, fg = theme.selection, theme.fg
 		}

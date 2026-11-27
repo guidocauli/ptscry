@@ -1455,6 +1455,7 @@ func (g *gui) treeMenu(r treeRow, pos image.Point) {
 			items = append(items,
 				menuItem{label: "Nuova sessione con nome…", enabled: true, do: func(layout.Context) { g.openNewSessionFor(r.profile) }},
 				menuItem{label: "Sessioni del server…", enabled: true, do: func(layout.Context) { g.openSessionsDialogFor(r.profile) }},
+				menuItem{label: "Gestione ptscry…", enabled: true, do: func(layout.Context) { g.kbdSide = true; g.openManageDialog() }},
 				menuItem{label: "Aggiorna le sessioni", enabled: true, key: "F5", do: func(layout.Context) { g.setOpen(r.key, true); g.refreshTree() }})
 		}
 		items = append(items, sep,

@@ -100,10 +100,12 @@ Per il computer in uso con server ptscry installato scegli invece il profilo **l
 
 ## 7. Gestire ptscry senza aprire un terminale
 
-**File → Gestione ptscry** esegue dalla finestra i comandi di `ptscry` sul profilo scelto: elenco e stato delle sessioni, job
-in background (`run -d` e risultato con `wait`), congela/scongela, host, configurazione e verifica. Sul profilo "locale" con i
-privilegi giusti ci sono anche le funzioni di amministrazione e il controllo del servizio `ptscry-monitor`. Le azioni distruttive
-chiedono "Sicuro?" al secondo clic. Dettagli in GUI.md ("Gestione ptscry").
+**File → Gestione ptscry** (o tasto destro su un server → **Gestione ptscry…**) esegue dalla finestra i comandi di `ptscry`.
+Scegli in **Dove** il server o questo computer, poi la scheda: **Sessioni e job** (clic su una sessione dell'elenco, poi
+Stato, Congela, Termina...; sotto, crea una sessione o lancia un job), **Host** (avvio, configurazione, verifica, arresto),
+**Amministrazione** e **Servizio** (solo sul server locale, con i privilegi giusti). Ogni azione ha accanto la spiegazione;
+quelle rosse fermano o cancellano qualcosa e chiedono conferma. Il risultato resta in basso, da copiare. Dettagli in GUI.md
+("Gestione ptscry").
 
 ## 8. Chiavi private
 

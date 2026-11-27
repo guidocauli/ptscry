@@ -316,19 +316,24 @@ delle chiavi gia' importate la scelgono. Una chiave con passphrase la chiede all
 
 ## Gestione ptscry
 
-**File -> Gestione ptscry** fa dalla finestra tutto quello che fa il comando `ptscry`, sul profilo scelto. Le voci che il profilo non
-permette sono nascoste (su un server remoto, via SSH, ptscry ammette solo i comandi sulle sessioni).
+**File → Gestione ptscry** (o **Gestione ptscry…** nel menu di un server della barra laterale) fa dalla finestra tutto
+quello che fa il comando `ptscry`. In alto **Dove**: un elenco a tendina, con ricerca, di questo computer (sessioni senza
+server, server locale) e dei server ptscry (con gruppo e indirizzo); parte dal server selezionato nella barra laterale o da
+quello del tab. Sotto, quattro schede; quelle che non valgono per il server scelto sono grigie, e la riga sotto le schede
+dice perché.
 
-| Gruppo | Voci | Profili |
+| Scheda | Contenuto | Dove vale |
 |---|---|---|
-| Sessioni e job | Elenca, Stato, Nuova staccata (`new -d`), Esegui job (`run -d`), Risultato del job (`wait`), Congela, Scongela, Termina / scarta | tutti |
-| Host | Avvia l'host, Ferma l'host | Avvia: senza server. Ferma: tutti |
-| Host | Configurazione (`config`), Verifica (`check`) | questo computer |
-| Amministrazione | sessioni di tutti, termina la sessione di un utente, ferma l'host di un utente, Verifica audit (`audit-verify`), verifica di un utente (`check -u`), registra il TOTP (`totp-init`), sostituisci il monitor (`admin reexec`) | "locale", con root o `admin_group` |
-| Servizio del monitor | Stato, Avvia, Ferma, Riavvia, Rileggi la config (`systemctl ... ptscry-monitor`; senza root usa `pkexec`) | "locale", Linux |
+| Sessioni e job | a sinistra l'**elenco delle sessioni** del server (stato, client collegati, directory; *Aggiorna*), a destra la sessione scelta (clic nell'elenco o nome scritto) con Stato, Risultato del job (`wait`), Congela, Scongela e, a parte in rosso, Termina / scarta; sotto **Crea**: comando, Nuova sessione staccata (`new -d`), Esegui un job (`run -d`) | ovunque |
+| Host | Avvia l'host; Configurazione (`config`), Verifica (`check`), Elenco delle sessioni (`list`); Ferma l'host | Avvia: senza server; Configurazione e Verifica: questo computer; il resto ovunque |
+| Amministrazione | utente e sessione in alto; Sessioni di tutti, Verifica l'audit, Verifica l'utente (`check -u`); Registra il TOTP, Termina una sua sessione, Ferma il suo host; Sostituisci il monitor (`admin reexec`) | server locale, con root o `admin_group` |
+| Servizio | Stato del servizio; Avvia, Rileggi la config, Riavvia, Ferma (`systemctl ... ptscry-monitor`, senza root con `pkexec`) | server locale, Linux |
 
-Il nome della sessione e il comando (parole separate da spazi, senza virgolette) si scrivono nei due campi in alto; l'utente appare
-per i profili "locale". Le azioni distruttive chiedono "Sicuro?" al secondo clic. Il risultato compare nel riquadro in basso, da copiare.
+Nelle schede Host, Amministrazione e Servizio ogni azione è una riga: il pulsante e, accanto, cosa fa. Le azioni che
+fermano o cancellano qualcosa sono rosse, stanno separate e chiedono conferma in una finestra che dice cosa succede e dove.
+Il **Risultato** (in basso, sempre visibile) mostra il comando eseguito e quello che ha scritto; *Copia*, *Pulisci*. Le
+azioni che cambiano le sessioni aggiornano da sole l'elenco e la barra laterale; quelle riuscite o fallite finiscono anche
+nel pannello Attività.
 
 ## Prestazioni e componenti modificati
 

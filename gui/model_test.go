@@ -406,3 +406,21 @@ func TestTabKindAndShellName(t *testing.T) {
 		t.Fatalf("title = %q", s)
 	}
 }
+
+func TestManagePages(t *testing.T) {
+	pages := map[string]bool{}
+	for _, p := range mgPages {
+		pages[p.key] = true
+	}
+	for _, a := range mgActions {
+		if !pages[a.page] || a.section == "" || a.about == "" {
+			t.Errorf("%q: page %q section %q about %q", a.label, a.page, a.section, a.about)
+		}
+	}
+	if !pageAvail("sess", "remote") || !pageAvail("host", "remote") || pageAvail("admin", "remote") || pageAvail("svc", "remote") {
+		t.Error("pages of a remote server")
+	}
+	if pageAvail("admin", "standalone") || !pageAvail("host", "standalone") {
+		t.Error("pages without server")
+	}
+}

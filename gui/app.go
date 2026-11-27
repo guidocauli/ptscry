@@ -901,6 +901,17 @@ func (g *gui) setDialog(d dialog) {
 	g.invalidate()
 }
 
+// stackDialog opens d over the current dialog, which comes back when d closes.
+func (g *gui) stackDialog(d dialog) {
+	g.dlgMu.Lock()
+	if g.dlg != nil {
+		g.dlgStack = append(g.dlgStack, g.dlg)
+	}
+	g.dlg = d
+	g.dlgMu.Unlock()
+	g.invalidate()
+}
+
 func (g *gui) closeDialog() {
 	g.dlgMu.Lock()
 	var next dialog
@@ -929,7 +940,11 @@ func (g *gui) drawDialog(gtx layout.Context, d dialog) {
 		}
 	}
 	outer := gtx.Constraints.Max
-	width := min(gtx.Dp(520), outer.X-gtx.Dp(24))
+	w := 520
+	if sd, ok := d.(interface{ dialogWidth() int }); ok {
+		w = sd.dialogWidth()
+	}
+	width := min(gtx.Dp(dpOf(w)), outer.X-gtx.Dp(24))
 	gtx.Constraints.Min = image.Pt(width, 0)
 	gtx.Constraints.Max.X = width
 	gtx.Constraints.Max.Y = max(outer.Y-gtx.Dp(16), gtx.Dp(60))
