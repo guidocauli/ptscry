@@ -1,6 +1,6 @@
 # ptscry - Guido Cauli <guido.cauli@gmail.com>
 
-# Manuale di amministrazione (versione 0.7.0)
+# Manuale di amministrazione (versione 0.7.1)
 
 Questo manuale e' per chi installa e gestisce ptscry. Per i comandi vedi `man ptscry`, per
 le chiavi di configurazione `man ptscry.conf`, per il modello di sicurezza e la mappatura

@@ -3,7 +3,7 @@
 Sessioni PTY persistenti e **auditate**: detach, reattach, replay dell'output, registrazione e
 audit a prova di manomissione. Nome: **pt**(y) + **scry** (divinare, osservare a distanza).
 
-Versione 0.7.0: comandi stile tmux/zellij (`rename`, `notify`, `send-keys`, layout salvati sul server, tasti `Ctrl-B s ( ) L c $ f m w`), pannelli nella GUI 0.8.0 e su terminale con **ptscry-tui**. Modalita' di produzione con **monitor root + host per utente**, dietro OpenSSH oppure con il **front-end SSH integrato** (processo non privilegiato confinato da seccomp, FIDO2 + certificati a breve durata + TOTP, `docs/MANUALE.md` 3.5). Le shell
+Versione 0.7.1 (GUI 0.8.1): cursore dei terminali come lo chiede il programma, barra del titolo e ingrandimento sui window manager a tasselli (Niri). Dalla 0.7.0: comandi stile tmux/zellij (`rename`, `notify`, `send-keys`, layout salvati sul server, tasti `Ctrl-B s ( ) L c $ f m w`), pannelli nella GUI 0.8.0 e su terminale con **ptscry-tui**. Modalita' di produzione con **monitor root + host per utente**, dietro OpenSSH oppure con il **front-end SSH integrato** (processo non privilegiato confinato da seccomp, FIDO2 + certificati a breve durata + TOTP, `docs/MANUALE.md` 3.5). Le shell
 nascono da un **launcher root con sessione PAM** (`pam_loginuid`, `pam_limits`, HBAC FreeIPA sul servizio `ptscry`).
 Dalla 0.6.0 il prefisso e' Ctrl-B (configurabile). Dalla 0.5: `ptscry run [-d]`/`wait`/`status` (job con exit code), limiti per utente con blocchi `Match` e `rate_limit`.
 Manuale di amministrazione (installazione, scenari, **audit: conservazione e analisi**) in
