@@ -239,7 +239,7 @@ func (d *layoutDialog) Layout(gtx layout.Context, g *gui) layout.Dimensions {
 		g.row(gtx, labeled(g, "Salvate", func(gtx layout.Context) layout.Dimensions { return d.names.Layout(gtx, g) })),
 		g.row(gtx, func(gtx layout.Context) layout.Dimensions {
 			return layout.Flex{}.Layout(gtx,
-				layout.Rigid(g.smallButton(&d.del, "Rimuovi", theme.bg)),
+				layout.Rigid(g.smallButton(&d.del, "Rimuovi", theme.input)),
 				layout.Flexed(1, func(gtx layout.Context) layout.Dimensions { return layout.Dimensions{Size: gtx.Constraints.Min} }),
 				layout.Rigid(g.smallButton(&d.load, "Apri in una nuova scheda", theme.accent)))
 		}),
@@ -256,7 +256,7 @@ func (d *layoutDialog) Layout(gtx layout.Context, g *gui) layout.Dimensions {
 		g.row(gtx, func(gtx layout.Context) layout.Dimensions {
 			return layout.Flex{}.Layout(gtx,
 				layout.Flexed(1, func(gtx layout.Context) layout.Dimensions { return layout.Dimensions{Size: gtx.Constraints.Min} }),
-				layout.Rigid(g.smallButton(&d.closeB, "Chiudi", theme.bg)))
+				layout.Rigid(g.smallButton(&d.closeB, "Chiudi", theme.input)))
 		}),
 	}
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx, kids...)

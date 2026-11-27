@@ -143,7 +143,7 @@ func (g *gui) rightClick(pos image.Point, mods key.Modifiers, barH int, haveDial
 	switch {
 	case g.hoverEd != nil:
 		items = g.editorMenu(g.hoverEd)
-	case !haveDialog && len(g.tabs) > 0 && pos.Y > barH:
+	case !haveDialog && len(g.tabs) > 0 && !g.home && pos.In(g.termRect):
 		cur := g.curTab()
 		if cur.model.MouseReporting() && mods&key.ModShift == 0 {
 			return // the program in the terminal uses the right button

@@ -181,6 +181,7 @@ type tab struct {
 	detail   string
 	term     *gterm
 	closing  bool
+	logged   string        // the last state written in the activity panel
 	detached bool          // the person asked to disconnect: no automatic reattach
 	frozen   bool          // the processes of the session are stopped
 	cwd      string        // last known directory of the session
@@ -235,6 +236,7 @@ func (a *gui) newTab(h *hub, sp tabSpec, scrollback int) *tab {
 		zoom: a.zoom, sessions: a.openSessionsDialog, workspaces: a.openWorkspacesDialog, rename: func() { a.openRenameDialog(t) }, env: func() { a.openEnvDialog(t) },
 		detach: func() { a.detachTab(t) }, freeze: func() { a.toggleFreeze(t) },
 		pane: func(act string) bool { return a.paneKey(t, act) },
+		app:  a.appKey,
 	}
 	go t.resizer()
 	go t.writer()
@@ -300,8 +302,36 @@ func (t *tab) setStatus(s, detail string) {
 	}
 	t.mu.Lock()
 	t.status, t.detail = s, detail
+	closing := t.closing
+	// the activity panel gets the changes, not every attempt of a reconnection
+	news := s != "connecting" && s != t.logged
+	if news {
+		t.logged = s
+	}
+	prof := t.profile
 	t.mu.Unlock()
+	if news && !closing {
+		t.logStatus(prof, s, detail)
+	}
 	t.app.invalidate()
+}
+
+// logStatus puts the changes of the connection in the activity panel.
+func (t *tab) logStatus(prof, s, detail string) {
+	who := prof + " · " + t.sessionName()
+	if t.h != nil && (t.h.p.Mode == "shell") {
+		who = "terminale locale"
+	}
+	switch s {
+	case "live":
+		t.app.logAct(false, "%s: collegato", who)
+	case "lost":
+		t.app.logAct(true, "%s: connessione persa (%s)", who, detail)
+	case "error":
+		t.app.logAct(true, "%s: errore: %s", who, detail)
+	case "ended":
+		t.app.logAct(false, "%s: chiuso (%s)", who, detail)
+	}
 }
 
 func (t *tab) State() (string, string) {

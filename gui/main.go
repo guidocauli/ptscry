@@ -59,8 +59,10 @@ func main() {
 				g.openSpec(specOf(t))
 			}
 			g.active = min(max(set.Active, 0), len(g.tabs)-1)
-		default:
+		case *sess != "" || set.StartTab:
 			g.openTab("", *sess)
+		default:
+			g.home = true // the welcome page, as in RexDesk
 		}
 		if err := g.run(w); err != nil {
 			fmt.Fprintln(os.Stderr, "ptscry-gui:", err)

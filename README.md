@@ -28,7 +28,8 @@ Modello di sicurezza e mappatura ISO/IEC 27001:2022 in [docs/ISO27001.md](docs/I
 ## Interfaccia grafica (ptscry-gui)
 
 Multiplexer grafico di sessioni con tab: terminale accelerato, Wayland nativo e X11 (anche su Niri, Hyprland e Sway), Windows e
-macOS; scrollback regolabile o illimitato, workspace con nome, gestore delle sessioni (elenco, sola lettura, termina), directory e
+macOS; finestra come quella di RexDesk (barra dei server con gruppi, Preferiti, colori e sessioni di ogni server, import da
+RexDesk e da `~/.ssh/config`, pagina di benvenuto, pannello Attività, impostazioni a schede); scrollback regolabile o illimitato, workspace con nome, gestore delle sessioni (elenco, sola lettura, termina), directory e
 variabili d'ambiente per sessione, menu contestuale e clipboard di sistema. Si usa su questo computer **senza server** (nessun
 root), sul front-end locale `127.0.0.1:2222` o su un server remoto. Moduli e sorgenti in `gui/`, manuale in
 [docs/GUIDA-GUI.md](docs/GUIDA-GUI.md) (guida all'uso), [docs/GUI.md](docs/GUI.md) (riferimento), `man ptscry-gui`, compilazione con `./build-gui.sh` (o `make gui`, `make gui-dist`, `make gui-test`).

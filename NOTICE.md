@@ -46,6 +46,7 @@ Inclusi nel repository con le loro licenze (compatibili con la AGPL):
 | golang.org/x/sys | `third_party/sys` | BSD-3-Clause |
 | Gio (gioui.org, con patch) | `gui/third_party/gio` | MIT / Unlicense |
 | charmbracelet/ultraviolet (con patch) | `gui/third_party/ultraviolet` | MIT |
+| Icone Material Design (golang.org/x/exp/shiny/materialdesign/icons) | modulo Go | Apache-2.0 |
 
 Moduli Go scaricati alla compilazione: charmbracelet/x (MIT), creack/pty (MIT), go-text (BSD/MIT),
 e i rispettivi indicati in `go.sum` di ciascun modulo.

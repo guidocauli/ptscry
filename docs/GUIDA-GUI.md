@@ -38,7 +38,10 @@ Per togliere tutto: stesso comando con `--uninstall` (Windows: `-Uninstall`). Le
 ## 3. Primo avvio
 
 1. Lancia **ptscry-gui** dal menu delle applicazioni (o da terminale).
-2. Si apre un tab con il profilo predefinito: **senza server** su Linux/macOS, cioe' una sessione locale persistente che non richiede root ne' SSH; su Windows **terminale locale**, una shell (PowerShell o cmd) che non sopravvive alla chiusura del tab. Per sessioni persistenti su Windows collegati a un server ptscry (capitolo 5).
+2. La finestra e' come quella di RexDesk: a sinistra la **barra dei server**, al centro la pagina **Benvenuto**, in basso il
+   pannello **Attività**. Doppio clic su **Questo computer → Sessioni senza server** (Linux/macOS: una sessione locale
+   persistente, senza root ne' SSH) o su **Terminale locale** (una shell che non sopravvive alla chiusura del tab; su Windows
+   e' l'unica senza server). In Impostazioni → Generale si puo' aprire subito la connessione predefinita, come prima.
 3. Scrivi come in un terminale qualunque. Il pulsante **+** (o `Ctrl+Maiusc+T`) apre un altro tab.
 4. Chiudi la finestra: le sessioni restano vive. Rilancia ptscry-gui e i tab tornano da soli.
 
@@ -46,7 +49,13 @@ Per togliere tutto: stesso comando con `--uninstall` (Windows: `-Uninstall`). Le
 
 | Voglio... | Faccio cosi' |
 |---|---|
-| un nuovo terminale | **+**, `Ctrl+Maiusc+T` |
+| un nuovo terminale | **+**, `Ctrl+Maiusc+T`, doppio clic su un server nella barra a sinistra |
+| aggiungere un server all'elenco | **+** in cima alla barra dei server (`Ctrl+Maiusc+N`), oppure **Importa** da RexDesk o da `~/.ssh/config` |
+| ordinare i server | gruppi (icona cartella, anche uno dentro l'altro), trascinamento su un gruppo, **Preferiti** col tasto destro, un colore per server o gruppo |
+| trovare un server | il filtro in cima alla barra (`Ctrl+F` nella barra): nomi, indirizzi, descrizioni, gruppi |
+| vedere le sessioni di un server | la freccia accanto al server: elenco delle sessioni, doppio clic per ricollegarsi |
+| vedere cosa e' successo | il pannello **Attività** in basso (`Ctrl+Maiusc+J`): connessioni, cadute, errori, avvisi |
+| piu' spazio per il terminale | `Ctrl+Maiusc+B` nasconde la barra dei server, `Ctrl+Maiusc+J` il pannello Attività, `F11` schermo intero |
 | dare un nome al tab | `Ctrl+Maiusc+R` (cambia solo l'etichetta) |
 | chiudere il tab senza uccidere la sessione | **x** (con piu' pannelli `Ctrl+Maiusc+W` chiude solo quello attivo) |
 | dividere il tab in pannelli | **Pannelli → Dividi a destra / sotto**, `Alt+Maiusc++` / `Alt+Maiusc+-`; ogni pannello e' una sessione sua |
@@ -68,6 +77,8 @@ Per togliere tutto: stesso comando con `--uninstall` (Windows: `-Uninstall`). Le
 | piu' spazio | **Vista → Nascondi la barra dei menu** (resta ☰), schermo intero |
 
 ## 5. Collegarsi a un altro computer
+
+Il modo piu' comodo: **+** in cima alla barra dei server (Aggiungi server), poi doppio clic sul server. Oppure, come prima:
 
 1. **+** (Nuova sessione) → **ptscry** per un server ptscry, oppure **SSH** per un server SSH qualsiasi.
 2. Scrivi indirizzo, porta e utente (o scegli una connessione salvata nell'elenco ricercabile in alto).

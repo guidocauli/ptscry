@@ -102,7 +102,7 @@ type menuGroup struct {
 // drop-down menus of the menu bar, and (joined) the content of the ☰ menu.
 func (g *gui) menuGroups() []menuGroup {
 	var cur *tab
-	if len(g.tabs) > 0 {
+	if len(g.tabs) > 0 && !g.home {
 		cur = g.curTab()
 	}
 	have := cur != nil
@@ -143,6 +143,7 @@ func (g *gui) menuGroups() []menuGroup {
 	return []menuGroup{
 		{"File", []menuItem{
 			{label: "Nuova sessione…", enabled: true, key: sc("T"), do: func(layout.Context) { g.openNewTabDialog() }},
+			{label: "Importa server…", enabled: true, do: func(layout.Context) { g.openImportDialog() }},
 			{label: "Rinomina tab…", enabled: have, key: sc("R"), do: func(layout.Context) { g.openRenameDialog(cur) }},
 			{label: "Chiudi tab", enabled: have, do: func(layout.Context) { g.closeTab(cur) }},
 			sep,
@@ -152,6 +153,7 @@ func (g *gui) menuGroups() []menuGroup {
 			sep,
 			{label: "Esci", enabled: true, do: func(layout.Context) { g.win.Perform(system.ActionClose) }},
 		}},
+		{"Server", g.serverMenu()},
 		{"Tab", tabs},
 		{"Pannelli", g.paneMenu(cur)},
 		{"Sessione", []menuItem{
@@ -180,15 +182,19 @@ func (g *gui) menuGroups() []menuGroup {
 			{label: "Riduci l'interfaccia", enabled: true, do: func(layout.Context) { g.uiZoom(-10) }},
 			{label: "Interfaccia a dimensione normale", enabled: true, do: func(layout.Context) { g.uiZoom(0) }},
 			sep,
+			{label: map[bool]string{true: "Nascondi la barra dei server", false: "Mostra la barra dei server"}[g.sidebarOn()], enabled: true, key: sc("B"), do: func(layout.Context) { g.toggleSidebar() }},
+			{label: map[bool]string{true: "Nascondi il pannello Attività", false: "Mostra il pannello Attività"}[g.activityOn()], enabled: true, key: sc("J"), do: func(layout.Context) { g.toggleActivity() }},
 			{label: barLabel, enabled: true, do: func(layout.Context) { g.toggleMenuBar() }},
 			{label: map[bool]string{true: "Nascondi la barra di stato", false: "Mostra la barra di stato"}[g.statusBarOn()], enabled: true, do: func(layout.Context) { g.toggleStatusBar() }},
-			{label: fsLabel, enabled: true, do: func(layout.Context) { g.toggleFullscreen() }},
+			{label: fsLabel, enabled: true, key: "F11", do: func(layout.Context) { g.toggleFullscreen() }},
 		}},
 		{"Finestra", []menuItem{
 			{label: maxLabel, enabled: true, do: func(layout.Context) { g.toggleMaximize() }},
 			{label: "Riduci a icona", enabled: true, do: func(layout.Context) { g.win.Perform(system.ActionMinimize) }},
 		}},
 		{"Aiuto", []menuItem{
+			{label: "Benvenuto", enabled: true, do: func(layout.Context) { g.home = true }},
+			{label: "Guida rapida", enabled: true, key: "F1", do: func(layout.Context) { g.openGuide() }},
 			{label: "Informazioni…", enabled: true, do: func(layout.Context) {
 				g.flashInfo("ptscry-gui %s - Guido Cauli <guido.cauli@gmail.com> · licenza AGPL-3.0, software libero SENZA ALCUNA GARANZIA (LICENSE, NOTICE.md)", guiVersion)
 			}},
@@ -251,7 +257,7 @@ func (g *gui) menuBar(gtx layout.Context) {
 		open := g.menu.open && g.menuOwner == i+1
 		d := b.Layout(bg, func(gtx layout.Context) layout.Dimensions {
 			if open || b.Hovered() {
-				paint.FillShape(gtx.Ops, theme.tabActive, clip.Rect{Max: gtx.Constraints.Max}.Op())
+				paint.FillShape(gtx.Ops, theme.hover, clip.Rect{Max: gtx.Constraints.Max}.Op())
 			}
 			l := material.Label(g.th, 13, gr.name)
 			l.Color = theme.fg
@@ -289,7 +295,7 @@ func (g *gui) menuButton(gtx layout.Context) layout.Dimensions {
 		if g.menu.open {
 			g.menu.open = false
 		} else {
-			g.openMainMenu(0, d.Size.Y) // below the button
+			g.openMainMenu(g.menuHot.Min.X, g.menuHot.Max.Y) // below the button
 		}
 	}
 	return d
@@ -301,7 +307,7 @@ func (g *gui) windowButton(gtx layout.Context, b *widget.Clickable, kind string)
 		sz := image.Pt(gtx.Dp(40), gtx.Constraints.Max.Y)
 		gtx.Constraints.Min, gtx.Constraints.Max = sz, sz
 		if b.Hovered() {
-			col := theme.tabActive
+			col := theme.hover
 			if kind == "close" {
 				col = color.NRGBA{R: 0xc4, G: 0x2b, B: 0x1c, A: 0xff}
 			}

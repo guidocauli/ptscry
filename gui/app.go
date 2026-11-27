@@ -19,7 +19,9 @@ import (
 	gioapp "gioui.org/app"
 	"gioui.org/font"
 	"gioui.org/font/gofont"
+	"gioui.org/io/event"
 	"gioui.org/io/key"
+	"gioui.org/io/pointer"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
@@ -28,6 +30,7 @@ import (
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
+	"golang.org/x/exp/shiny/materialdesign/icons"
 
 	"ptscry/internal/rclient"
 )
@@ -71,7 +74,18 @@ type gui struct {
 
 	dlgList widget.List
 	menuState
-	lastSaved  time.Time
+	lastSaved time.Time
+	// RexDesk-like parts: the side bar of the servers, the welcome page, the activity panel
+	side     sideState
+	welcome  welcomeState
+	act      activityState
+	home     bool            // the welcome page is shown instead of the terminals
+	termRect image.Rectangle // where the terminals are, in the window
+	homeBtn  widget.Clickable
+	kbdSide  bool // the keyboard is in the side bar (the last click was there), not in the terminal
+	sideTag  byte // a pass-through area over the side bar
+	termTag  byte // a pass-through area over the terminals
+
 	noticeMu   sync.Mutex
 	notice     string
 	noticeInfo bool
@@ -119,7 +133,9 @@ func newGUI(set settings) *gui {
 	shaper := text.NewShaper(text.WithCollection(gofont.Collection()))
 	th := material.NewTheme()
 	th.Shaper = shaper
-	th.Palette = material.Palette{Bg: theme.chrome, Fg: theme.chromeText, ContrastBg: theme.accent, ContrastFg: theme.bg}
+	// the font of RexDesk (Fyne uses Noto Sans), or the usual one of the system
+	th.Face = "Noto Sans, Segoe UI, Helvetica Neue, Cantarell, DejaVu Sans, Go"
+	th.Palette = material.Palette{Bg: theme.chrome, Fg: theme.chromeText, ContrastBg: theme.accent, ContrastFg: theme.accentFg}
 	return &gui{set: set, th: th, shaper: shaper, termShaper: newTermShaper(set.FontFile), hubs: map[string]*hub{}, wake: make(chan struct{}, 1), ctl: make(chan ctlReq, 8),
 		tabBtn: map[int]*widget.Clickable{}, closeBtn: map[int]*widget.Clickable{}}
 }
@@ -156,6 +172,16 @@ func (g *gui) flash(format string, a ...any) { g.setNotice(false, format, a...) 
 func (g *gui) setNotice(info bool, format string, a ...any) {
 	g.noticeMu.Lock()
 	g.notice, g.noticeAt, g.noticeInfo = fmt.Sprintf(format, a...), time.Now(), info
+	msg := g.notice
+	g.noticeMu.Unlock()
+	g.logAct(!info, "%s", msg)
+	g.invalidate()
+}
+
+// flashQuiet is a notice that does not go to the activity panel (copied to the clipboard...).
+func (g *gui) flashQuiet(format string, a ...any) {
+	g.noticeMu.Lock()
+	g.notice, g.noticeAt, g.noticeInfo = fmt.Sprintf(format, a...), time.Now(), true
 	g.noticeMu.Unlock()
 	g.invalidate()
 }
@@ -215,6 +241,7 @@ func (g *gui) openSpec(sp tabSpec) {
 		return
 	}
 	sp.profile, sp.session = profileName, session
+	g.home, g.kbdSide = false, false // the keyboard goes to the new terminal
 	t := g.newTab(g.hubFor(profileName), sp, g.set.Scrollback)
 	g.tabMu.Lock()
 	g.tabs = append(g.tabs, t)
@@ -264,14 +291,17 @@ func (g *gui) closeTab(t *tab) {
 		break
 	}
 	if len(g.tabs) == 0 {
-		g.openTab("", "")
+		g.home = true // the welcome page, as in RexDesk (the sessions go on on the server)
 	}
 	g.invalidate()
 }
 
 func (g *gui) cycle(d int) {
-	if n := len(g.tabs); n > 1 {
-		g.active = (g.active + d + n) % n
+	if n := len(g.tabs); n > 1 || n == 1 && g.home {
+		if !g.home {
+			g.active = (g.active + d + n) % n
+		}
+		g.home = false
 		g.saveWorkspace()
 	}
 }
@@ -467,18 +497,26 @@ func (g *gui) layout(gtx layout.Context) {
 	g.dlgMu.Unlock()
 	g.runQueued()
 	g.takeControls()
+	var lead, cur *tab
 	if len(g.tabs) == 0 {
-		return
+		g.home = true
+	} else {
+		g.active = min(max(g.active, 0), len(g.tabs)-1)
+		lead = g.tabs[g.active]
+		cur = lead.focused()
 	}
-	g.active = min(max(g.active, 0), len(g.tabs)-1)
-	lead := g.tabs[g.active]
-	cur := lead.focused()
 	// only when it changes: on Windows every Option reconfigures the window
 	// (SetWindowPos), which asks for a new frame, which set the title again: an
 	// endless loop that froze and then crashed the program
-	if title := cur.title(); title != "" && title != g.winTitle {
+	title := "ptscry"
+	if !g.home && cur != nil {
+		if t := cur.title(); t != "" {
+			title = t + " - ptscry"
+		}
+	}
+	if title != g.winTitle {
 		g.winTitle = title
-		g.win.Option(gioapp.Title(title + " - ptscry"))
+		g.win.Option(gioapp.Title(title))
 	}
 	// The interface (menus, tabs, dialogs) is scaled by the setting on top of the
 	// DPI of the screen; the terminal keeps its own size (font size in dp).
@@ -500,43 +538,120 @@ func (g *gui) layout(gtx layout.Context) {
 	} else {
 		g.menubarH = 0
 	}
-	bar := ugtx.Dp(32)
-	{
-		st := op.Offset(image.Pt(0, top)).Push(ugtx.Ops)
-		bg := ugtx
-		bg.Constraints = layout.Exact(image.Pt(W, bar))
-		g.tabBar(bg, bar)
-		st.Pop()
-	}
-	top += bar
-	if g.menuBarOn() {
-		g.menuHot = image.Rect(0, 0, W, g.menubarH)
-	} else {
-		g.menuHot = image.Rect(0, 0, ugtx.Dp(34), bar)
-	}
 	sb := 0
 	if g.statusBarOn() {
 		sb = ugtx.Dp(22)
 	}
+	// the side bar of the servers, from under the menus to the status bar
+	sideW := g.sidebarWidth(ugtx, W)
+	if sideW > 0 {
+		st := op.Offset(image.Pt(0, top)).Push(ugtx.Ops)
+		sg := ugtx
+		sg.Constraints = layout.Exact(image.Pt(sideW, max(H-top-sb, 1)))
+		g.sidebar(sg, image.Pt(0, top))
+		st.Pop()
+	}
+	cx, cw := sideW, max(W-sideW, 1)
+	bar := ugtx.Dp(32)
 	{
-		st := op.Offset(image.Pt(0, top)).Push(gtx.Ops)
+		st := op.Offset(image.Pt(cx, top)).Push(ugtx.Ops)
+		bg := ugtx
+		bg.Constraints = layout.Exact(image.Pt(cw, bar))
+		g.tabBar(bg, bar)
+		st.Pop()
+	}
+	if g.menuBarOn() {
+		g.menuHot = image.Rect(0, 0, W, g.menubarH)
+	} else {
+		g.menuHot = image.Rect(cx, top, cx+ugtx.Dp(34), top+bar)
+	}
+	bodyTop := top + bar
+	actH := g.activityHeight(ugtx, H-bodyTop-sb)
+	bodyH := max(H-bodyTop-sb-actH, 1)
+	g.termRect = image.Rect(cx, bodyTop, cx+cw, bodyTop+bodyH)
+	if g.home || lead == nil {
+		st := op.Offset(image.Pt(cx, bodyTop)).Push(ugtx.Ops)
+		wg := ugtx
+		wg.Constraints = layout.Exact(image.Pt(cw, bodyH))
+		g.welcomePage(wg)
+		st.Pop()
+	} else {
+		st := op.Offset(image.Pt(cx, bodyTop)).Push(gtx.Ops)
 		tg := gtx
-		tg.Constraints = layout.Exact(image.Pt(W, max(H-top-sb, 1)))
-		g.layoutPanes(tg, lead, dlg == nil && !g.menu.open)
+		tg.Constraints = layout.Exact(image.Pt(cw, bodyH))
+		g.layoutPanes(tg, lead, dlg == nil && !g.menu.open && !g.kbdSide)
+		st.Pop()
+	}
+	// who gets the keyboard: the side bar or the terminal, after the last click
+	g.clickOwner(gtx, &g.termTag, g.termRect, false)
+	if sideW > 0 {
+		g.clickOwner(gtx, &g.sideTag, image.Rect(0, top, sideW, H-sb), true)
+	} else {
+		g.kbdSide = false
+	}
+	if actH > 0 {
+		st := op.Offset(image.Pt(cx, bodyTop+bodyH)).Push(ugtx.Ops)
+		ag := ugtx
+		ag.Constraints = layout.Exact(image.Pt(cw, actH))
+		g.activityPanel(ag)
 		st.Pop()
 	}
 	if sb > 0 {
 		st := op.Offset(image.Pt(0, H-sb)).Push(ugtx.Ops)
 		sg := ugtx
 		sg.Constraints = layout.Exact(image.Pt(W, sb))
-		g.statusBar(sg, lead, cur)
+		if g.home || lead == nil {
+			g.creditsBar(sg)
+		} else {
+			g.statusBar(sg, lead, cur)
+		}
 		st.Pop()
 	}
+	g.windowKeys(ugtx, dlg != nil)
 	if dlg != nil {
 		g.drawDialog(ugtx, dlg)
 	}
-	g.statusLine(ugtx)
+	g.statusLine(ugtx, image.Rect(cx, 0, W, bodyTop+bodyH))
+	if sideW > 0 && dlg == nil {
+		g.toolTip(ugtx, image.Pt(0, top+g.side.toolY))
+	}
 	g.layoutMenu(ugtx, top, dlg != nil)
+}
+
+// clickOwner: a press in r gives the keyboard to the side bar (side) or to the terminal.
+func (g *gui) clickOwner(gtx layout.Context, tag *byte, r image.Rectangle, side bool) {
+	for {
+		ev, ok := gtx.Event(pointer.Filter{Target: tag, Kinds: pointer.Press})
+		if !ok {
+			break
+		}
+		if e, ok := ev.(pointer.Event); ok && e.Kind == pointer.Press {
+			g.kbdSide = side
+		}
+	}
+	st := clip.Rect(r).Push(gtx.Ops)
+	pass := pointer.PassOp{}.Push(gtx.Ops)
+	event.Op(gtx.Ops, tag)
+	pass.Pop()
+	st.Pop()
+}
+
+// creditsBar is the status bar of the welcome page: the program and its
+// author, as in RexDesk, and what is selected in the side bar.
+func (g *gui) creditsBar(gtx layout.Context) {
+	paint.FillShape(gtx.Ops, theme.chrome, clip.Rect{Max: gtx.Constraints.Max}.Op())
+	paint.FillShape(gtx.Ops, theme.line, clip.Rect{Max: image.Pt(gtx.Constraints.Max.X, 1)}.Op())
+	s := "ptscry-gui " + guiVersion + " - Guido Cauli <guido.cauli@gmail.com>"
+	if r, ok := g.selectedRow(); ok && r.kind != nodeNote {
+		s = r.label
+		if r.detail != "" {
+			s += "  ·  " + r.detail
+		}
+	}
+	l := material.Label(g.th, 12, s)
+	l.Color = theme.chromeText
+	l.MaxLines = 1
+	layout.Inset{Left: 8, Top: 3}.Layout(gtx, l.Layout)
 }
 
 // uiFactor is the interface scale (1 = what the screen DPI gives).
@@ -581,12 +696,21 @@ func (g *gui) tabBar(gtx layout.Context, h int) layout.Dimensions {
 	if g.showWindowButtons() {
 		reserved += gtx.Dp(120)
 	}
+	// the "Benvenuto" tab, always first (as in RexDesk): only the icon when there are others
+	if g.homeBtn.Clicked(gtx) {
+		g.home = true
+	}
+	children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+		return g.homeTab(gtx, h)
+	}))
+	reserved += gtx.Dp(40)
 	tabW := max(min(gtx.Dp(220), (gtx.Constraints.Max.X-reserved)/max(len(g.tabs), 1)), gtx.Dp(60))
 	for i, t := range g.tabs {
 		i, t := i, t
 		btn, cls := clickable(g.tabBtn, t.id), clickable(g.closeBtn, t.id)
 		if btn.Clicked(gtx) {
 			g.active = i
+			g.home, g.kbdSide = false, false
 			g.saveWorkspace()
 		}
 		if cls.Clicked(gtx) {
@@ -595,7 +719,7 @@ func (g *gui) tabBar(gtx layout.Context, h int) layout.Dimensions {
 		}
 		children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			gtx.Constraints.Max.X = tabW
-			return g.oneTab(gtx, t, i == g.active, btn, cls)
+			return g.oneTab(gtx, t, i == g.active && !g.home, btn, cls)
 		}))
 	}
 	children = append(children,
@@ -625,6 +749,47 @@ func (g *gui) iconButton(gtx layout.Context, b *widget.Clickable, label string) 
 	})
 }
 
+// homeTab is the tab of the welcome page.
+func (g *gui) homeTab(gtx layout.Context, h int) layout.Dimensions {
+	only := len(g.tabs) == 0
+	return g.homeBtn.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		w := gtx.Dp(36)
+		if only {
+			w = gtx.Dp(130)
+		}
+		sz := image.Pt(w, h)
+		if g.homeBtn.Hovered() && !g.home {
+			paint.FillShape(gtx.Ops, theme.hover, clip.Rect{Max: sz}.Op())
+		}
+		col := theme.chromeText
+		if g.home {
+			col = theme.accent
+			paint.FillShape(gtx.Ops, theme.accent, clip.Rect{Min: image.Pt(0, h-gtx.Dp(2)), Max: sz}.Op())
+		}
+		is := gtx.Dp(16)
+		x := (w - is) / 2
+		if only {
+			x = gtx.Dp(10)
+		}
+		st := op.Offset(image.Pt(x, (h-is)/2)).Push(gtx.Ops)
+		ig := gtx
+		ig.Constraints = layout.Exact(image.Pt(is, is))
+		if ic := g.side.icon("home", icons.ActionHome); ic != nil {
+			ic.Layout(ig, col)
+		}
+		st.Pop()
+		if only {
+			l := material.Label(g.th, 13, "Benvenuto")
+			l.Color = col
+			l.Font.Weight = font.SemiBold
+			st := op.Offset(image.Pt(x+is+gtx.Dp(6), (h-gtx.Dp(18))/2)).Push(gtx.Ops)
+			l.Layout(gtx)
+			st.Pop()
+		}
+		return layout.Dimensions{Size: sz}
+	})
+}
+
 func (g *gui) oneTab(gtx layout.Context, t *tab, active bool, btn, cls *widget.Clickable) layout.Dimensions {
 	h := gtx.Constraints.Max.Y
 	bg := theme.chrome
@@ -632,15 +797,26 @@ func (g *gui) oneTab(gtx layout.Context, t *tab, active bool, btn, cls *widget.C
 		bg = theme.tabActive
 	}
 	paint.FillShape(gtx.Ops, bg, clip.Rect{Max: image.Pt(gtx.Constraints.Max.X, h)}.Op())
-	// the colour of the kind, along the base of the tab (brighter when active)
-	kc := kindColor(t.kind())
-	bh := gtx.Dp(2)
-	if !active {
-		kc.A = 0x90
-	} else {
-		bh = gtx.Dp(3)
+	if btn.Hovered() && !active {
+		paint.FillShape(gtx.Ops, theme.hover, clip.Rect{Max: image.Pt(gtx.Constraints.Max.X, h)}.Op())
 	}
-	paint.FillShape(gtx.Ops, kc, clip.Rect{Min: image.Pt(0, h-bh), Max: image.Pt(gtx.Constraints.Max.X, h)}.Op())
+	// as in RexDesk: a band with the colour of the server (or of the kind) on
+	// the left, and a blue line under the active tab
+	kc := kindColor(t.kind())
+	g.setMu.Lock()
+	if p := g.set.profile(t.profile); p != nil {
+		if c, ok := parseColor(g.set.colorOf(*p)); ok {
+			kc = c
+		}
+	}
+	g.setMu.Unlock()
+	if !active {
+		kc.A = 0xa0
+	}
+	paint.FillShape(gtx.Ops, kc, clip.Rect{Min: image.Pt(0, gtx.Dp(6)), Max: image.Pt(gtx.Dp(3), h-gtx.Dp(6))}.Op())
+	if active {
+		paint.FillShape(gtx.Ops, theme.accent, clip.Rect{Min: image.Pt(0, h-gtx.Dp(2)), Max: image.Pt(gtx.Constraints.Max.X, h)}.Op())
+	}
 	return btn.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 		f := t.focused()
 		title := g.activityMark(t) + f.title()
@@ -688,13 +864,13 @@ func (g *gui) oneTab(gtx layout.Context, t *tab, active bool, btn, cls *widget.C
 
 // statusLine shows a short message at the bottom right for a few seconds, and
 // the state of the connection when it is not a normal one.
-func (g *gui) statusLine(gtx layout.Context) {
+func (g *gui) statusLine(gtx layout.Context, area image.Rectangle) {
 	msg := ""
 	notice, noticeAt, noticeInfo := g.getNotice()
 	if time.Since(noticeAt) < 6*time.Second {
 		msg = notice
 	}
-	if len(g.tabs) > 0 {
+	if len(g.tabs) > 0 && !g.home {
 		if st, d := g.curTab().State(); (st == "lost" || st == "error") && msg == "" {
 			msg = d
 		}
@@ -702,12 +878,10 @@ func (g *gui) statusLine(gtx layout.Context) {
 	if msg == "" {
 		return
 	}
-	sb := 0
-	if g.statusBarOn() {
-		sb = gtx.Dp(22)
-	}
-	defer op.Offset(image.Pt(0, gtx.Constraints.Max.Y-gtx.Dp(26)-sb)).Push(gtx.Ops).Pop()
-	paint.FillShape(gtx.Ops, color.NRGBA{R: 0x1d, G: 0x20, B: 0x26, A: 0xe8}, clip.Rect{Max: image.Pt(gtx.Constraints.Max.X, gtx.Dp(26))}.Op())
+	// at the bottom of the terminals, over them
+	defer op.Offset(image.Pt(area.Min.X, area.Max.Y-gtx.Dp(26))).Push(gtx.Ops).Pop()
+	gtx.Constraints.Max.X = area.Dx()
+	paint.FillShape(gtx.Ops, color.NRGBA{R: 0x20, G: 0x20, B: 0x23, A: 0xf0}, clip.Rect{Max: image.Pt(gtx.Constraints.Max.X, gtx.Dp(26))}.Op())
 	l := material.Label(g.th, 12, msg)
 	l.Color = theme.warn
 	if noticeInfo && time.Since(noticeAt) < 6*time.Second {
@@ -740,7 +914,8 @@ func (g *gui) closeDialog() {
 }
 
 func (g *gui) drawDialog(gtx layout.Context, d dialog) {
-	paint.FillShape(gtx.Ops, color.NRGBA{A: 0x99}, clip.Rect{Max: gtx.Constraints.Max}.Op())
+	// as in RexDesk: no veil behind the dialog (it still blocks the window), a thin frame
+	paint.FillShape(gtx.Ops, color.NRGBA{A: 0x30}, clip.Rect{Max: gtx.Constraints.Max}.Op())
 	// Escape closes it
 	for {
 		ev, ok := gtx.Event(key.Filter{Name: key.NameEscape})
@@ -767,6 +942,7 @@ func (g *gui) drawDialog(gtx layout.Context, d dialog) {
 	call := macro.Stop()
 	x, y := (outer.X-dims.Size.X)/2, max((outer.Y-dims.Size.Y)/3, gtx.Dp(8))
 	defer op.Offset(image.Pt(x, y)).Push(gtx.Ops).Pop()
+	paint.FillShape(gtx.Ops, theme.line, clip.UniformRRect(image.Rectangle{Max: dims.Size}.Inset(-1), gtx.Dp(8)).Op(gtx.Ops))
 	paint.FillShape(gtx.Ops, theme.chrome, clip.UniformRRect(image.Rectangle{Max: dims.Size}, gtx.Dp(8)).Op(gtx.Ops))
 	call.Add(gtx.Ops)
 }
@@ -799,11 +975,11 @@ func (g *gui) fieldFont(ed *widget.Editor, hint string, mono bool) layout.Widget
 				e.TextSize = 12
 			}
 			e.Color = theme.fg
-			e.HintColor = theme.chromeText
+			e.HintColor = theme.disabled
 			return layout.Background{}.Layout(gtx,
 				func(gtx layout.Context) layout.Dimensions {
 					sz := gtx.Constraints.Min
-					paint.FillShape(gtx.Ops, theme.bg, clip.UniformRRect(image.Rectangle{Max: sz}, gtx.Dp(4)).Op(gtx.Ops))
+					paint.FillShape(gtx.Ops, theme.input, clip.UniformRRect(image.Rectangle{Max: sz}, gtx.Dp(4)).Op(gtx.Ops))
 					return layout.Dimensions{Size: sz}
 				},
 				func(gtx layout.Context) layout.Dimensions { return layout.UniformInset(8).Layout(gtx, e.Layout) })
@@ -816,13 +992,13 @@ func (g *gui) buttons(ok, cancel *widget.Clickable, okLabel string) layout.Widge
 		return layout.Flex{Axis: layout.Horizontal, Spacing: layout.SpaceStart}.Layout(gtx,
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 				b := material.Button(g.th, cancel, "Annulla")
-				b.Background, b.Color = theme.bg, theme.chromeText
+				b.Background, b.Color = theme.input, theme.chromeText
 				return b.Layout(gtx)
 			}),
 			layout.Rigid(layout.Spacer{Width: 10}.Layout),
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 				b := material.Button(g.th, ok, okLabel)
-				b.Background, b.Color = theme.accent, theme.bg
+				b.Background, b.Color = theme.accent, theme.accentFg
 				return b.Layout(gtx)
 			}),
 		)
@@ -907,6 +1083,17 @@ type settingsDialog struct {
 	choose   widget.Clickable
 	faceFile string // file of the font chosen from the list
 	shell    *combo
+	// pages, as in RexDesk
+	page          string
+	pageBtn       [3]widget.Clickable
+	sideOn, actOn widget.Bool
+	startTab      widget.Bool
+}
+
+var settingsPages = []struct{ key, label, about string }{
+	{"general", "Generale", "Connessione predefinita, avvio, comandi per le sessioni nuove, shell del terminale locale."},
+	{"look", "Aspetto", "Dimensione dell'interfaccia, barre e pannelli della finestra."},
+	{"term", "Terminale", "Carattere, righe di scrollback e cursore dei terminali."},
 }
 
 func (g *gui) openSettingsDialog() {
@@ -945,6 +1132,15 @@ func (g *gui) openSettingsDialog() {
 	d.def.SetItems(pitems)
 	d.def.Choose(s.Default)
 	d.restore.Value = s.Restore
+	d.sideOn.Value = s.Sidebar != "off"
+	d.actOn.Value = s.ActLog != "off"
+	d.startTab.Value = s.StartTab
+	d.page = "general"
+	for _, pg := range settingsPages {
+		if pg.key == s.SetTab {
+			d.page = pg.key
+		}
+	}
 	if p := s.profile(shellName); p != nil {
 		d.shell = newCombo(shellHint, "nessuna shell trovata")
 		items := []comboItem{{Label: "automatica", Detail: autoShellName(), Value: ""}}
@@ -999,6 +1195,9 @@ func (d *settingsDialog) Layout(gtx layout.Context, g *gui) layout.Dimensions {
 			g.set.Default = it.Value
 		}
 		g.set.Restore = d.restore.Value
+		g.set.StartTab = d.startTab.Value
+		g.set.Sidebar = map[bool]string{true: "on", false: "off"}[d.sideOn.Value]
+		g.set.ActLog = map[bool]string{true: "on", false: "off"}[d.actOn.Value]
 		if d.shell != nil {
 			if v := d.shell.Value(); validShellCmd(v) {
 				if p := g.set.profile(shellName); p != nil {
@@ -1021,99 +1220,109 @@ func (d *settingsDialog) Layout(gtx layout.Context, g *gui) layout.Dimensions {
 		g.applyDecorations()
 		g.flashInfo("impostazioni salvate")
 	}
+	for i, pg := range settingsPages {
+		if d.pageBtn[i].Clicked(gtx) && d.page != pg.key {
+			d.page = pg.key
+			g.setMu.Lock()
+			g.set.SetTab = pg.key // the next time it opens here
+			g.setMu.Unlock()
+			g.dlgList.Position = layout.Position{}
+		}
+	}
+	radios := func(e *widget.Enum, opts ...string) layout.FlexChild {
+		return g.row(gtx, func(gtx layout.Context) layout.Dimensions {
+			var ch []layout.FlexChild
+			for i := 0; i+1 < len(opts); i += 2 {
+				if i > 0 {
+					ch = append(ch, layout.Rigid(layout.Spacer{Width: 10}.Layout))
+				}
+				ch = append(ch, layout.Rigid(material.RadioButton(g.th, e, opts[i], opts[i+1]).Layout))
+			}
+			return layout.Flex{Axis: layout.Horizontal}.Layout(gtx, ch...)
+		})
+	}
+	about := ""
+	for _, pg := range settingsPages {
+		if pg.key == d.page {
+			about = pg.about
+		}
+	}
 	kids := []layout.FlexChild{
-		g.row(gtx, g.label("Dimensione del carattere")), g.row(gtx, g.field(&d.font, "14")),
-		g.row(gtx, g.label("Carattere (nome di un font a spaziatura fissa; vuoto = Go Mono)")),
+		g.row(gtx, g.title("Impostazioni")),
 		g.row(gtx, func(gtx layout.Context) layout.Dimensions {
-			return layout.Flex{Axis: layout.Horizontal, Alignment: layout.Middle}.Layout(gtx,
-				layout.Flexed(1, g.field(&d.face, "")),
-				layout.Rigid(layout.Spacer{Width: 6}.Layout),
-				layout.Rigid(g.smallButton(&d.choose, "Scegli dall'elenco...", theme.bg)),
-			)
+			var ch []layout.FlexChild
+			for i, pg := range settingsPages {
+				i, pg := i, pg
+				ch = append(ch, layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
+					return (&newSessionDialog{}).kindButton(gtx, g, &d.pageBtn[i], pg.label, d.page == pg.key)
+				}))
+				if i < len(settingsPages)-1 {
+					ch = append(ch, layout.Rigid(layout.Spacer{Width: 4}.Layout))
+				}
+			}
+			return layout.Flex{Axis: layout.Horizontal}.Layout(gtx, ch...)
 		}),
-		g.row(gtx, g.label("Righe di scrollback")),
-		g.row(gtx, func(gtx layout.Context) layout.Dimensions {
-			return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
-				layout.Rigid(material.RadioButton(g.th, &d.scroll, "1000", "1000").Layout),
-				layout.Rigid(layout.Spacer{Width: 10}.Layout),
-				layout.Rigid(material.RadioButton(g.th, &d.scroll, "10000", "10 000").Layout),
-				layout.Rigid(layout.Spacer{Width: 10}.Layout),
-				layout.Rigid(material.RadioButton(g.th, &d.scroll, "100000", "100 000").Layout),
-				layout.Rigid(layout.Spacer{Width: 10}.Layout),
-				layout.Rigid(material.RadioButton(g.th, &d.scroll, "unlimited", "illimitato").Layout),
-			)
-		}),
-		g.row(gtx, g.label("Dimensione dell'interfaccia: menu, tab, finestre di dialogo (% sopra i DPI dello schermo, 60-300; 100 = normale)")), g.row(gtx, g.field(&d.uiscale, "100")),
-		g.row(gtx, g.label("Barra dei menu a tendina")),
-		g.row(gtx, func(gtx layout.Context) layout.Dimensions {
-			return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
-				layout.Rigid(material.RadioButton(g.th, &d.mbar, "on", "sempre visibile").Layout),
-				layout.Rigid(layout.Spacer{Width: 10}.Layout),
-				layout.Rigid(material.RadioButton(g.th, &d.mbar, "off", "nascosta (resta il pulsante ☰)").Layout),
-			)
-		}),
-		g.row(gtx, g.label("Connessione predefinita per i nuovi tab")),
+		g.row(gtx, small(g, about)),
 	}
-	{
-		at := len(kids) - 1
-		extra := []layout.FlexChild{
-			g.row(gtx, g.label("Cursore del terminale")),
-			g.row(gtx, func(gtx layout.Context) layout.Dimensions {
-				return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
-					layout.Rigid(material.RadioButton(g.th, &d.cursor, "app", "come chiede il programma").Layout),
-					layout.Rigid(layout.Spacer{Width: 10}.Layout),
-					layout.Rigid(material.RadioButton(g.th, &d.cursor, "blink", "lampeggiante").Layout),
-					layout.Rigid(layout.Spacer{Width: 10}.Layout),
-					layout.Rigid(material.RadioButton(g.th, &d.cursor, "steady", "fisso").Layout),
-				)
-			}),
-		}
-		kids = append(kids[:at], append(extra, kids[at:]...)...)
-	}
-	if tilingPossible {
-		// only where a tiling window manager may draw the frame (Linux, BSD):
-		// Windows and macOS always have their own title bar
-		at := len(kids) - 1
-		extra := []layout.FlexChild{
-			g.row(gtx, g.label("Barra del titolo (con Niri, Hyprland, Sway... \"auto\" la toglie)")),
-			g.row(gtx, func(gtx layout.Context) layout.Dimensions {
-				return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
-					layout.Rigid(material.RadioButton(g.th, &d.deco, "auto", "automatica").Layout),
-					layout.Rigid(layout.Spacer{Width: 10}.Layout),
-					layout.Rigid(material.RadioButton(g.th, &d.deco, "on", "sempre").Layout),
-					layout.Rigid(layout.Spacer{Width: 10}.Layout),
-					layout.Rigid(material.RadioButton(g.th, &d.deco, "off", "mai").Layout),
-				)
-			}),
-			g.row(gtx, g.label("Pulsanti riduci / ingrandisci / chiudi nella barra dei tab")),
-			g.row(gtx, func(gtx layout.Context) layout.Dimensions {
-				return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
-					layout.Rigid(material.RadioButton(g.th, &d.wbtn, "auto", "solo senza barra del titolo").Layout),
-					layout.Rigid(layout.Spacer{Width: 10}.Layout),
-					layout.Rigid(material.RadioButton(g.th, &d.wbtn, "on", "sempre").Layout),
-					layout.Rigid(layout.Spacer{Width: 10}.Layout),
-					layout.Rigid(material.RadioButton(g.th, &d.wbtn, "off", "mai").Layout),
-				)
-			}),
-		}
-		kids = append(kids[:at], append(extra, kids[at])...)
-	}
-	kids = append(kids, g.row(gtx, func(gtx layout.Context) layout.Dimensions { return d.def.Layout(gtx, g) }))
-	kids = append(kids,
-		layout.Rigid(layout.Spacer{Height: 8}.Layout),
-		g.row(gtx, g.label("Comandi da scrivere in ogni sessione creata di nuovo (una riga ciascuno: export, alias...)")),
-		g.row(gtx, g.field(&d.startup, "export EDITOR=vim")),
-		g.row(gtx, material.CheckBox(g.th, &d.restore, "Riapri i tab dell'ultima volta all'avvio").Layout),
-	)
-	if d.shell != nil {
+	switch d.page {
+	case "general":
 		kids = append(kids,
-			g.row(gtx, g.label("Shell del \"terminale locale\" (ogni nuovo tab puo' sceglierne un'altra)")),
-			g.row(gtx, func(gtx layout.Context) layout.Dimensions { return d.shell.Layout(gtx, g) }),
+			g.row(gtx, g.heading("Connessione predefinita")),
+			g.row(gtx, small(g, "Quella dei nuovi tab (Ctrl+Maiusc+T, +).")),
+			g.row(gtx, func(gtx layout.Context) layout.Dimensions { return d.def.Layout(gtx, g) }),
+			g.row(gtx, g.heading("Avvio")),
+			g.row(gtx, material.CheckBox(g.th, &d.restore, "Riapri i tab dell'ultima volta (e ricollegati alle loro sessioni)").Layout),
+			g.row(gtx, material.CheckBox(g.th, &d.startTab, "Senza tab da riaprire: apri la connessione predefinita invece del Benvenuto").Layout),
+			g.row(gtx, g.heading("Sessioni nuove")),
+			g.row(gtx, g.label("Comandi da scrivere in ogni sessione creata di nuovo (una riga ciascuno: export, alias...)")),
+			g.row(gtx, g.field(&d.startup, "export EDITOR=vim")),
+		)
+		if d.shell != nil {
+			kids = append(kids,
+				g.row(gtx, g.heading("Terminale locale")),
+				g.row(gtx, g.label("Shell del \"terminale locale\" (ogni nuovo tab puo' sceglierne un'altra)")),
+				g.row(gtx, func(gtx layout.Context) layout.Dimensions { return d.shell.Layout(gtx, g) }),
+			)
+		}
+	case "look":
+		kids = append(kids,
+			g.row(gtx, g.heading("Interfaccia")),
+			g.row(gtx, g.label("Dimensione: menu, tab, finestre di dialogo (% sopra i DPI dello schermo, 60-300; 100 = normale)")), g.row(gtx, g.field(&d.uiscale, "100")),
+			g.row(gtx, g.heading("Parti della finestra")),
+			g.row(gtx, material.CheckBox(g.th, &d.sideOn, "Barra dei server a sinistra (Ctrl+Maiusc+B)").Layout),
+			g.row(gtx, material.CheckBox(g.th, &d.actOn, "Pannello Attività in basso (Ctrl+Maiusc+J)").Layout),
+			g.row(gtx, g.label("Barra dei menu a tendina")),
+			radios(&d.mbar, "on", "sempre visibile", "off", "nascosta (resta il pulsante ☰)"),
+		)
+		if tilingPossible {
+			// only where a tiling window manager may draw the frame (Linux, BSD):
+			// Windows and macOS always have their own title bar
+			kids = append(kids,
+				g.row(gtx, g.label("Barra del titolo (con Niri, Hyprland, Sway... \"auto\" la toglie)")),
+				radios(&d.deco, "auto", "automatica", "on", "sempre", "off", "mai"),
+				g.row(gtx, g.label("Pulsanti riduci / ingrandisci / chiudi nella barra dei tab")),
+				radios(&d.wbtn, "auto", "solo senza barra del titolo", "on", "sempre", "off", "mai"),
+			)
+		}
+	case "term":
+		kids = append(kids,
+			g.row(gtx, g.heading("Carattere")),
+			g.row(gtx, g.label("Dimensione")), g.row(gtx, g.field(&d.font, "14")),
+			g.row(gtx, g.label("Nome (un font a spaziatura fissa; vuoto = Go Mono)")),
+			g.row(gtx, func(gtx layout.Context) layout.Dimensions {
+				return layout.Flex{Axis: layout.Horizontal, Alignment: layout.Middle}.Layout(gtx,
+					layout.Flexed(1, g.field(&d.face, "")),
+					layout.Rigid(layout.Spacer{Width: 6}.Layout),
+					layout.Rigid(g.smallButton(&d.choose, "Scegli dall'elenco...", theme.input)),
+				)
+			}),
+			g.row(gtx, g.heading("Scrollback")),
+			radios(&d.scroll, "1000", "1000", "10000", "10 000", "100000", "100 000", "unlimited", "illimitato"),
+			g.row(gtx, g.heading("Cursore")),
+			radios(&d.cursor, "app", "come chiede il programma", "blink", "lampeggiante", "steady", "fisso"),
 		)
 	}
-	kids = append(kids,
-		g.row(gtx, g.buttons(&d.ok, &d.can, "Salva")),
-	)
+	kids = append(kids, layout.Rigid(layout.Spacer{Height: 8}.Layout), g.row(gtx, g.buttons(&d.ok, &d.can, "Salva")))
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx, kids...)
 }
 

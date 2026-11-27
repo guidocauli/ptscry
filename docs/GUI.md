@@ -92,18 +92,70 @@ Valgono per ogni sessione: locale senza server, locale con server e remota.
   scongela prima di chiuderla. Alla ripartenza la shell puo' scrivere `Stopped` per il programma in primo piano: e' solo la sua notifica.
   Sui server serve ptscry 0.6.11 o piu' recente (`ptscry freeze|thaw NOME` si usa anche da riga di comando).
 
+## 2.1 La finestra: barra dei server, Benvenuto, Attività
+
+La finestra ha la stessa struttura di RexDesk: a sinistra la **barra dei server**, a destra i tab con i terminali, in basso
+il pannello **Attività** e la barra di stato.
+
+**Barra dei server** (`Ctrl+Maiusc+B` la mostra o nasconde; il bordo destro si trascina per allargarla). In alto le icone:
+aggiungi server, nuovo gruppo, modifica, elimina, importa, aggiorna le sessioni, apri (il nome compare tenendoci sopra il
+mouse); sotto, il filtro (`Ctrl+F`; cerca in nomi, indirizzi, descrizioni e gruppi: un gruppo trovato mostra tutto il suo
+contenuto; la **×** lo svuota). L'albero contiene:
+
+- **Questo computer**: il terminale locale, le sessioni senza server e il server locale;
+- **Preferiti**: i server segnati come preferiti (restano anche nei loro gruppi);
+- i **gruppi**, anche uno dentro l'altro, con i loro server; poi i server senza gruppo.
+
+Sotto un server ptscry (freccia, `→` o clic sulla freccia) compaiono le sue **sessioni**, lette dal server (e riaggiornate
+ogni 10 secondi finche' il nodo e' aperto; `F5` subito). Lo stato: ● verde collegato, ● arancione in connessione, ○ tab aperto
+ma non collegato; per una sessione ● verde = mostrata in un tab, ○ verde = collegata da un altro client.
+
+| Azione | Come |
+|---|---|
+| Aprire | doppio clic o `Invio`: su un server ptscry una **nuova sessione**, su un server SSH il login, sul terminale locale una shell; su una sessione il suo tab (o un tab nuovo collegato a lei) |
+| Menu | tasto destro: per il server nuova sessione con nome, sessioni, Preferiti, modifica, duplica, elimina; per la sessione apri, sola lettura, in un nuovo pannello, rinomina (sul server), congela/scongela, termina; per il gruppo aggiungi server, sottogruppo, apri/chiudi tutti, modifica, elimina |
+| Spostare | trascinare un server su un gruppo (lo sposta), su **Preferiti** (lo aggiunge) o nello spazio vuoto (lo toglie dai gruppi) |
+| Tastiera | frecce, `PagSu`/`PagGiu`, `Home`/`Fine`; `←`/`→` chiude/apre; `F2` modifica; `Canc` elimina (sempre con conferma; per una sessione = termina); `Esc` svuota il filtro |
+
+La tastiera va alla barra quando ci si clicca, e torna al terminale cliccando nel terminale, su un tab o aprendo qualcosa.
+
+**Server e gruppi.** *Aggiungi server* (anche `Ctrl+Maiusc+N`, menu **Server**) chiede tipo (ptscry o SSH), nome,
+indirizzo, porta e utente, accesso (agente, chiave, password per SSH; chiave per ptscry), jump host e comando (SSH),
+**gruppo** (scrivendo un nome nuovo il gruppo viene creato), **descrizione**, **colore** (dieci pronti o `#RRGGBB`; vuoto =
+quello del gruppo) e **Preferiti**. Il colore compare nell'albero e come banda sul tab. Rinominare un server aggiorna i tab
+aperti, i workspace e la connessione predefinita. Un gruppo ha nome, gruppo superiore, descrizione e colore; eliminandolo i
+suoi server e sottogruppi passano al gruppo superiore (non vengono eliminati). Eliminare un server lo toglie solo
+dall'elenco: le sue sessioni sul server restano.
+
+**Importa server** (icona, menu File o Server): da **RexDesk** (il suo `config.json`: gruppi con i genitori, utente, porta,
+metodo di accesso, chiave e certificato, jump host anche indicato col nome di un altro server, colore, Preferiti, ereditati
+dai gruppi come fa RexDesk; i server RDP, VNC, FTP e quelli disattivati si saltano) o da **~/.ssh/config** (blocchi `Host`
+con `HostName`, `User`, `Port`, `IdentityFile`, `ProxyJump`, `Include`; i modelli con `*` `?` `!` e i blocchi `Match` non
+sono server), oppure da un altro file. Si importano come server SSH o come server ptscry (front-end sulla porta 2222).
+L'anteprima mostra cosa entra: un server con lo stesso indirizzo non viene importato due volte, un nome gia' usato
+diventa "nome (2)". I file vengono solo letti; password e passphrase non ci sono e non vengono chieste.
+
+**Benvenuto.** All'avvio, se non ci sono tab da riaprire, e dopo aver chiuso l'ultimo tab compare la pagina di benvenuto:
+cosa fa il programma, come cominciare, i tasti utili e i pulsanti **Aggiungi server**, **Importa**, **Nuova sessione…**,
+**Guida rapida** (`F1` fuori dal terminale). La casetta a sinistra dei tab la riporta in primo piano. In Impostazioni si puo'
+invece aprire la connessione predefinita come prima.
+
+**Attività** (`Ctrl+Maiusc+J`; il bordo superiore si trascina): connessioni, connessioni perse (una riga per caduta, non
+una per tentativo), errori, avvisi, server aggiunti, modificati, importati, sessioni terminate o rinominate; le piu' recenti
+in alto, al massimo 500. Un clic copia la riga; *Copia tutto*, *Pulisci*, *Nascondi*.
+
 ## 3. Uso
 
 | Azione | Come |
 |---|---|
 | Nuova sessione | pulsante **+**, `Ctrl+Maiusc+T`, menu File |
 | Riconoscere i tab | le sessioni ptscry hanno il prefisso **[PTS]** e una linea azzurra alla base, le connessioni SSH **[SSH]** e una linea rossa, i terminali di questo computer il nome della shell (`bash`, `zsh`, `pwsh`...; con la sessione persistente anche il suo nome) e una linea verde |
-| Chiudere il tab | **x** (la sessione resta viva, si stacca soltanto; con piu' pannelli `Ctrl+Maiusc+W` chiude solo quello attivo) |
+| Chiudere il tab | **x** (la sessione resta viva, si stacca soltanto; con piu' pannelli `Ctrl+Maiusc+W` chiude solo quello attivo); chiuso l'ultimo, torna il Benvenuto |
 | Cambiare tab | clic, `Ctrl+PagGiu` / `Ctrl+PagSu`, `Ctrl+Tab` / `Ctrl+Maiusc+Tab` |
 | Copiare / incollare | selezionare col mouse (copia da solo), `Ctrl+Maiusc+C` / `Ctrl+Maiusc+V`, `Ctrl+Ins` / `Maiusc+Ins`, click centrale, menu col tasto destro |
 | Scorrere lo storico | rotella, `Maiusc+PagSu` / `PagGiu`, `Maiusc+Home` / `Fine` |
 | Ingrandire / ridurre / ripristinare il carattere | `Ctrl` (anche con `Maiusc`) e `+` / `-` / `0`, `Ctrl`+rotella; funziona con qualunque tastiera (anche quella italiana) |
-| Menu a tendina | barra dei menu in alto, visibile di default: **File**, **Tab**, **Sessione**, **Modifica**, **Vista**, **Finestra**, **Aiuto**, con le scorciatoie accanto (con la barra nascosta resta il pulsante **☰**, che li riunisce tutti) |
+| Menu a tendina | barra dei menu in alto, visibile di default: **File**, **Server**, **Tab**, **Pannelli**, **Sessione**, **Modifica**, **Vista**, **Finestra**, **Aiuto**, con le scorciatoie accanto (con la barra nascosta resta il pulsante **☰**, che li riunisce tutti) |
 | Sessioni del server | menu, `Ctrl+Maiusc+S` |
 | Workspace | menu, `Ctrl+Maiusc+O` |
 | Variabili d'ambiente del tab | menu, `Ctrl+Maiusc+E` |
@@ -112,7 +164,7 @@ Valgono per ogni sessione: locale senza server, locale con server e remota.
 | Congelare / scongelare la sessione (ferma tutti i suoi processi, `[II]` nel titolo del tab) | menu, `Ctrl+Maiusc+F`, pulsante **Congela** in Sessioni |
 | Impostazioni | menu |
 | Ridurre a icona / ingrandire-ripristinare / chiudere la finestra | i tre pulsanti a destra della barra dei tab (su tutte le piattaforme, quando la finestra non ha la barra del titolo di sistema), oppure il menu; doppio clic sulla zona libera della barra = ingrandisci/ripristina, trascinarla = sposta la finestra |
-| Schermo intero | menu |
+| Schermo intero | `F11`, menu |
 
 Il distacco e' quello di ptscry: `Ctrl-B` poi `d` (o il prefisso di `client.conf`). Dopo un distacco o la fine della sessione il
 tab mostra un messaggio: **Invio** riattacca, `Ctrl+Maiusc+W` chiude. Se la connessione cade il tab si ricollega da solo (fino a
@@ -186,6 +238,11 @@ Valgono solo per le sessioni create dalla GUI; non toccano quelle che esistono g
 e l'ambiente, non i programmi. Finche' il server resta acceso, invece, tutto continua a girare.
 
 ## 6. Impostazioni
+
+A schede, come in RexDesk, ciascuna con una riga che ne dice il contenuto; riapre l'ultima usata. **Generale**: connessione
+predefinita, riapertura dei tab, Benvenuto o connessione predefinita all'avvio, comandi per le sessioni nuove, shell del
+terminale locale. **Aspetto**: dimensione dell'interfaccia, barra dei server, pannello Attività, barra dei menu, barra del
+titolo e pulsanti della finestra. **Terminale**: carattere, scrollback, cursore. Nel dettaglio:
 
 Dimensione e nome del carattere (a spaziatura fissa; vuoto = Go Mono incluso; i simboli mancanti li prende dai font di sistema; **Scegli dall'elenco...** mostra i font a spaziatura fissa installati (OpenType/TrueType: i font Type 1 e bitmap non si possono usare), con filtro e **anteprima** disegnata con il file del font stesso, quindi uguale su Linux, Windows e macOS; il font scelto viene caricato dal suo file, non cercato per nome; lo stesso elenco e' in **Vista → Scegli il carattere del terminale...**, che applica la scelta subito a tutti i tab),
 righe di scrollback (1000, 10000, 100000, illimitato = un milione), **cursore del terminale** (come lo chiede il programma, predefinito: forma blocco/sottolineato/barra e lampeggio con DECSCUSR, come vim o la shell; oppure sempre lampeggiante o sempre fisso, mantenendo la forma chiesta), barra del titolo, profilo predefinito, comandi di avvio, riapertura dei tab.

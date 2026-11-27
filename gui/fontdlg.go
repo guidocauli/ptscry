@@ -201,7 +201,7 @@ func (d *fontDialog) Layout(gtx layout.Context, g *gui) layout.Dimensions {
 							if on {
 								paint.FillShape(gtx.Ops, theme.selection, clip.Rect{Max: gtx.Constraints.Min}.Op())
 							} else if d.rows[i].Hovered() {
-								paint.FillShape(gtx.Ops, theme.bg, clip.Rect{Max: gtx.Constraints.Min}.Op())
+								paint.FillShape(gtx.Ops, theme.input, clip.Rect{Max: gtx.Constraints.Min}.Op())
 							}
 							return layout.Dimensions{Size: gtx.Constraints.Min}
 						}),
@@ -230,7 +230,7 @@ func (d *fontDialog) Layout(gtx layout.Context, g *gui) layout.Dimensions {
 			// the sample on the terminal's own colours
 			return layout.Stack{}.Layout(gtx,
 				layout.Expanded(func(gtx layout.Context) layout.Dimensions {
-					paint.FillShape(gtx.Ops, theme.bg, clip.Rect{Max: gtx.Constraints.Min}.Op())
+					paint.FillShape(gtx.Ops, theme.input, clip.Rect{Max: gtx.Constraints.Min}.Op())
 					return layout.Dimensions{Size: gtx.Constraints.Min}
 				}),
 				layout.Stacked(func(gtx layout.Context) layout.Dimensions {
@@ -260,9 +260,9 @@ func (d *fontDialog) Layout(gtx layout.Context, g *gui) layout.Dimensions {
 		}),
 		g.row(gtx, func(gtx layout.Context) layout.Dimensions {
 			return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
-				layout.Rigid(g.smallButton(&d.dflt, "Go Mono (predefinito)", theme.bg)),
+				layout.Rigid(g.smallButton(&d.dflt, "Go Mono (predefinito)", theme.input)),
 				layout.Flexed(1, func(gtx layout.Context) layout.Dimensions { return layout.Dimensions{Size: gtx.Constraints.Min} }),
-				layout.Rigid(g.smallButton(&d.can, "Annulla", theme.bg)),
+				layout.Rigid(g.smallButton(&d.can, "Annulla", theme.input)),
 				layout.Rigid(layout.Spacer{Width: 6}.Layout),
 				layout.Rigid(g.smallButton(&d.use, "Usa questo carattere", theme.accent)),
 			)

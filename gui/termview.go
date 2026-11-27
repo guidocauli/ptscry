@@ -38,7 +38,8 @@ type termCommands struct {
 	detach, freeze                     func()          // disconnect from the session / freeze-thaw it
 	zoom                               func(delta int) // font size, +1 / -1 / 0 = reset
 	invalidate                         func()
-	pane                               func(action string) bool // panes (Alt+Shift+...): true = done
+	pane                               func(action string) bool                     // panes (Alt+Shift+...): true = done
+	app                                func(name key.Name, mods key.Modifiers) bool // keys of the window (side bar, activity, F11): true = done
 }
 
 // termView is one terminal on screen.
@@ -496,6 +497,12 @@ func (t *termView) keyPress(gtx layout.Context, e key.Event) {
 			act = "preset"
 		}
 		if act != "" && t.cmd.pane(act) {
+			return
+		}
+	}
+	// the window's own keys: Ctrl+Shift+B / J / N and F11
+	if t.cmd.app != nil && ((cs && (e.Name == "B" || e.Name == "J" || e.Name == "N")) || e.Name == key.NameF11 && e.Modifiers == 0) {
+		if t.cmd.app(e.Name, e.Modifiers) {
 			return
 		}
 	}

@@ -619,9 +619,9 @@ func (d *newSessionDialog) Layout(gtx layout.Context, g *gui) layout.Dimensions 
 // kindButton is one segment of the choice of the kind.
 func (d *newSessionDialog) kindButton(gtx layout.Context, g *gui, c *widget.Clickable, label string, on bool) layout.Dimensions {
 	return c.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-		bg, fg := theme.bg, theme.chromeText
+		bg, fg := theme.input, theme.chromeText
 		if on {
-			bg, fg = theme.accent, theme.chrome
+			bg, fg = theme.accent, theme.accentFg
 		} else if c.Hovered() {
 			bg, fg = theme.selection, theme.fg
 		}
@@ -657,7 +657,7 @@ func (d *newSessionDialog) serverPart(gtx layout.Context, g *gui, head func(stri
 					if _, ok := d.savedCombo.Chosen(); !ok {
 						return layout.Dimensions{}
 					}
-					label, bg := "Elimina", theme.bg
+					label, bg := "Elimina", theme.input
 					if d.forgetArmed {
 						label, bg = "Sicuro?", theme.warn
 					}
@@ -693,9 +693,9 @@ func (d *newSessionDialog) serverPart(gtx layout.Context, g *gui, head func(stri
 			g.row(gtx, func(gtx layout.Context) layout.Dimensions { return d.keyCombo.Layout(gtx, g) }),
 			g.row(gtx, func(gtx layout.Context) layout.Dimensions {
 				return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
-					layout.Rigid(g.smallButton(&d.browse, "Importa una chiave…", theme.bg)),
+					layout.Rigid(g.smallButton(&d.browse, "Importa una chiave…", theme.input)),
 					layout.Rigid(layout.Spacer{Width: 8}.Layout),
-					layout.Rigid(g.smallButton(&d.manageKeys, "Elenco delle chiavi…", theme.bg)),
+					layout.Rigid(g.smallButton(&d.manageKeys, "Elenco delle chiavi…", theme.input)),
 				)
 			}),
 		)
@@ -741,7 +741,7 @@ func (d *newSessionDialog) sessionPart(gtx layout.Context, g *gui, head func(str
 				return layout.Flex{Axis: layout.Horizontal, Alignment: layout.Start}.Layout(gtx,
 					layout.Flexed(1, func(gtx layout.Context) layout.Dimensions { return d.existing.Layout(gtx, g) }),
 					layout.Rigid(layout.Spacer{Width: 6}.Layout),
-					layout.Rigid(g.smallButton(&d.refresh, "Aggiorna", theme.bg)),
+					layout.Rigid(g.smallButton(&d.refresh, "Aggiorna", theme.input)),
 				)
 			}),
 			g.row(gtx, small(g, d.listMsg)),

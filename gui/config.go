@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"ptscry/internal/rclient"
 )
@@ -31,6 +32,19 @@ type profile struct {
 	Auth    string `json:"auth,omitempty"`    // "agent" (default), "key" (Identity) or "password"
 	Jump    string `json:"jump,omitempty"`    // [user@]host[:port] to go through, as ssh -J
 	Command string `json:"command,omitempty"` // run instead of the login shell
+	// where it sits in the tree of the side bar, as in RexDesk
+	Group       string `json:"group,omitempty"`       // "" = at the top level
+	Favorite    bool   `json:"favorite,omitempty"`    // also in the Preferiti group
+	Color       string `json:"color,omitempty"`       // #RRGGBB, "" = the group's
+	Description string `json:"description,omitempty"` // shown under the name
+}
+
+// group is a folder of the tree in the side bar; groups nest through Parent.
+type group struct {
+	Name        string `json:"name"`
+	Parent      string `json:"parent,omitempty"`
+	Color       string `json:"color,omitempty"`
+	Description string `json:"description,omitempty"`
 }
 
 const (
@@ -79,9 +93,17 @@ type settings struct {
 	Cursor      string      `json:"cursor,omitempty"`     // "" = as the program asks (DECSCUSR), "blink", "steady"
 	Default     string      `json:"default_profile"`
 	Profiles    []profile   `json:"profiles"`
+	Groups      []group     `json:"groups,omitempty"`
+	Sidebar     string      `json:"sidebar,omitempty"`      // the tree of the servers: "on" (default) or "off"
+	SidebarW    int         `json:"sidebar_w,omitempty"`    // its width in dp
+	ActLog      string      `json:"activity,omitempty"`     // the activity panel at the bottom: "on" (default) or "off"
+	ActLogH     int         `json:"activity_h,omitempty"`   // its height in dp
+	SetTab      string      `json:"settings_tab,omitempty"` // the last page of the settings
+	Open        []string    `json:"open_groups,omitempty"`  // the open branches of the tree
 	Workspaces  []workspace `json:"workspaces,omitempty"`
 	Startup     string      `json:"startup,omitempty"` // typed (line by line) into every session created anew
 	Restore     bool        `json:"restore_workspace"`
+	StartTab    bool        `json:"start_tab,omitempty"` // with nothing to reopen: a tab of the default connection instead of the welcome page
 	Tabs        []tabState  `json:"tabs,omitempty"`
 	Active      int         `json:"active,omitempty"`
 	WinW        int         `json:"win_w,omitempty"`
@@ -232,6 +254,41 @@ func (s settings) sanitized() settings {
 			s.Default = shellName // saved before this profile existed: "locale" never worked there without a server
 		}
 	}
+	s.Groups = cleanGroups(s.Groups)
+	known := map[string]bool{}
+	for _, gr := range s.Groups {
+		known[gr.Name] = true
+	}
+	for i := range ps {
+		p := &ps[i]
+		if !known[p.Group] {
+			p.Group = ""
+		}
+		if !validColor(p.Color) {
+			p.Color = ""
+		}
+		p.Description = cleanLine(p.Description, 200)
+	}
+	switch s.Sidebar {
+	case "on", "off":
+	default:
+		s.Sidebar = "on"
+	}
+	switch s.ActLog {
+	case "on", "off":
+	default:
+		s.ActLog = "on"
+	}
+	if s.SidebarW != 0 {
+		s.SidebarW = min(max(s.SidebarW, 140), 700)
+	}
+	if s.ActLogH != 0 {
+		s.ActLogH = min(max(s.ActLogH, 50), 600)
+	}
+	if len(s.Open) > 1000 {
+		s.Open = s.Open[:1000]
+	}
+	s.SetTab = cleanLine(s.SetTab, 20)
 	s.Profiles = ps
 	if s.profile(s.Default) == nil {
 		s.Default = d.Default
@@ -259,6 +316,107 @@ func (s settings) sanitized() settings {
 		s.WinW, s.WinH = 0, 0
 	}
 	return s
+}
+
+// cleanGroups keeps the groups with a sane, unique name; a parent that does
+// not exist, or that would make a loop, becomes the top level.
+func cleanGroups(in []group) []group {
+	var out []group
+	seen := map[string]bool{}
+	for _, gr := range in {
+		gr.Name = strings.TrimSpace(gr.Name)
+		if !validGroupName(gr.Name) || seen[gr.Name] || len(out) >= 500 {
+			continue
+		}
+		seen[gr.Name] = true
+		if !validColor(gr.Color) {
+			gr.Color = ""
+		}
+		gr.Description = cleanLine(gr.Description, 200)
+		out = append(out, gr)
+	}
+	parent := map[string]string{}
+	for i := range out {
+		if !seen[out[i].Parent] || out[i].Parent == out[i].Name {
+			out[i].Parent = ""
+		}
+		parent[out[i].Name] = out[i].Parent
+	}
+	for i := range out { // a loop (a is under b, b under a): cut it here
+		n, steps := out[i].Parent, 0
+		for n != "" && steps <= len(out) {
+			if n == out[i].Name {
+				out[i].Parent = ""
+				parent[out[i].Name] = ""
+				break
+			}
+			n, steps = parent[n], steps+1
+		}
+	}
+	return out
+}
+
+func validGroupName(s string) bool {
+	return s != "" && len(s) <= 64 && !strings.ContainsAny(s, "\x00\r\n\t")
+}
+
+// validColor: "" or #RRGGBB.
+func validColor(s string) bool {
+	if s == "" {
+		return true
+	}
+	if len(s) != 7 || s[0] != '#' {
+		return false
+	}
+	for _, c := range s[1:] {
+		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F') {
+			return false
+		}
+	}
+	return true
+}
+
+// cleanLine is s on one line, without control characters, at most n bytes.
+func cleanLine(s string, n int) string {
+	s = strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7f {
+			return ' '
+		}
+		return r
+	}, strings.TrimSpace(s))
+	for len(s) > n {
+		_, sz := utf8.DecodeLastRuneInString(s)
+		s = s[:len(s)-sz]
+	}
+	return s
+}
+
+func (s *settings) groupByName(name string) *group {
+	for i := range s.Groups {
+		if s.Groups[i].Name == name {
+			return &s.Groups[i]
+		}
+	}
+	return nil
+}
+
+// colorOf is the colour of a server: its own, else its group's (or a parent's).
+func (s *settings) colorOf(p profile) string {
+	if p.Color != "" {
+		return p.Color
+	}
+	n := p.Group
+	for i := 0; n != "" && i < 50; i++ {
+		gr := s.groupByName(n)
+		if gr == nil {
+			break
+		}
+		if gr.Color != "" {
+			return gr.Color
+		}
+		n = gr.Parent
+	}
+	return ""
 }
 
 func orLocalUser(p profile) string {

@@ -341,7 +341,7 @@ func (d *keysDialog) Layout(gtx layout.Context, g *gui) layout.Dimensions {
 							case on:
 								paint.FillShape(gtx.Ops, theme.selection, clip.Rect{Max: gtx.Constraints.Min}.Op())
 							case d.rows[i].Hovered():
-								paint.FillShape(gtx.Ops, theme.bg, clip.Rect{Max: gtx.Constraints.Min}.Op())
+								paint.FillShape(gtx.Ops, theme.input, clip.Rect{Max: gtx.Constraints.Min}.Op())
 							}
 							return layout.Dimensions{Size: gtx.Constraints.Min}
 						}),
@@ -377,7 +377,7 @@ func (d *keysDialog) Layout(gtx layout.Context, g *gui) layout.Dimensions {
 		}),
 	}
 	if sel != nil {
-		delLabel, delBg := "Rimuovi", theme.bg
+		delLabel, delBg := "Rimuovi", theme.input
 		if d.delArmed {
 			delLabel, delBg = "Sicuro?", theme.warn
 		}
@@ -387,9 +387,9 @@ func (d *keysDialog) Layout(gtx layout.Context, g *gui) layout.Dimensions {
 				b = append(b, layout.Rigid(g.smallButton(&d.use, "Usa questa chiave", theme.accent)), layout.Rigid(layout.Spacer{Width: 6}.Layout))
 			}
 			b = append(b,
-				layout.Rigid(g.smallButton(&d.copyPub, "Copia la chiave pubblica", theme.bg)),
+				layout.Rigid(g.smallButton(&d.copyPub, "Copia la chiave pubblica", theme.input)),
 				layout.Rigid(layout.Spacer{Width: 6}.Layout),
-				layout.Rigid(g.smallButton(&d.ren, "Rinomina", theme.bg)),
+				layout.Rigid(g.smallButton(&d.ren, "Rinomina", theme.input)),
 				layout.Rigid(layout.Spacer{Width: 6}.Layout),
 				layout.Rigid(g.smallButton(&d.del, delLabel, delBg)),
 			)
@@ -402,7 +402,7 @@ func (d *keysDialog) Layout(gtx layout.Context, g *gui) layout.Dimensions {
 					layout.Rigid(layout.Spacer{Width: 6}.Layout),
 					layout.Rigid(g.smallButton(&d.renameOK, "OK", theme.accent)),
 					layout.Rigid(layout.Spacer{Width: 6}.Layout),
-					layout.Rigid(g.smallButton(&d.renameNo, "Annulla", theme.bg)),
+					layout.Rigid(g.smallButton(&d.renameNo, "Annulla", theme.input)),
 				)
 			}))
 		}
@@ -421,16 +421,16 @@ func (d *keysDialog) Layout(gtx layout.Context, g *gui) layout.Dimensions {
 				return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
 					layout.Rigid(g.smallButton(&d.genOK, "Crea la chiave", theme.accent)),
 					layout.Rigid(layout.Spacer{Width: 6}.Layout),
-					layout.Rigid(g.smallButton(&d.genNo, "Annulla", theme.bg)),
+					layout.Rigid(g.smallButton(&d.genNo, "Annulla", theme.input)),
 				)
 			}),
 		)
 	}
 	kids = append(kids, layout.Rigid(layout.Spacer{Height: 6}.Layout), g.row(gtx, func(gtx layout.Context) layout.Dimensions {
 		return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
-			layout.Rigid(g.smallButton(&d.imp, "Importa da file…", theme.bg)),
+			layout.Rigid(g.smallButton(&d.imp, "Importa da file…", theme.input)),
 			layout.Rigid(layout.Spacer{Width: 6}.Layout),
-			layout.Rigid(g.smallButton(&d.gen, "Genera una nuova chiave…", theme.bg)),
+			layout.Rigid(g.smallButton(&d.gen, "Genera una nuova chiave…", theme.input)),
 			layout.Flexed(1, func(gtx layout.Context) layout.Dimensions { return layout.Dimensions{Size: gtx.Constraints.Min} }),
 			layout.Rigid(g.smallButton(&d.close, "Chiudi", theme.accent)),
 		)

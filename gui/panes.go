@@ -154,6 +154,7 @@ func (g *gui) splitPane(side bool, sp *tabSpec) {
 	if len(g.tabs) == 0 {
 		return
 	}
+	g.home = false
 	l := g.tabs[g.active]
 	if len(l.panes()) >= maxPanes {
 		g.flash("al massimo %d pannelli per scheda", maxPanes)

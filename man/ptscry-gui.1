@@ -44,13 +44,24 @@ Front-end SSH di questo computer, 127.0.0.1:2222 (server con \fBfrontend = yes\f
 .B remoto
 \fI[utente@]host[:porta]\fR, con chiave privata (file o ssh-agent), certificato e TOTP. La chiave del server si accetta
 al primo uso e si salva in \fI~/.config/ptscry/known_hosts\fR; se cambia, il collegamento e' rifiutato.
+.SH FINESTRA
+Come in RexDesk: a sinistra la barra dei server, con icone (aggiungi server, nuovo gruppo, modifica, elimina, importa,
+aggiorna, apri), filtro e albero (Questo computer, Preferiti, gruppi annidati, server; sotto un server ptscry le sue
+sessioni). Doppio clic o Invio apre (nuova sessione, login SSH, shell; una sessione nel suo tab); tasto destro per il menu;
+un server si trascina su un gruppo o sui Preferiti; F2 modifica, Canc elimina (con conferma), F5 aggiorna, Ctrl+F filtra.
+Ogni server e gruppo ha descrizione e colore (anche sul tab). \fBImporta\fR legge i server di RexDesk
+(\fIconfig.json\fR) o di \fI~/.ssh/config\fR, senza duplicati. Senza tab compare la pagina \fBBenvenuto\fR; in basso
+il pannello \fBAttivita'\fR registra connessioni, cadute, errori e avvisi (clic = copia la riga).
 .SH MENU
 La barra dei menu (visibile di default; con \fBVista\fR si nasconde e resta il pulsante a tre linee \fB\[u2630]\fR) contiene:
 .TP
 .B File
 Nuova sessione (terminale locale, server locale, SSH, ptscry; connessioni salvate in un elenco ricercabile), Rinomina, Chiudi; Gestione ptscry (tutti i comandi di
 .BR ptscry ),
-Chiavi private (importa con il selettore di file di sistema), Impostazioni; Esci.
+Chiavi private (importa con il selettore di file di sistema), Impostazioni (a schede: Generale, Aspetto, Terminale); Esci.
+.TP
+.B Server
+Aggiungi server, Nuovo gruppo, Importa, apri / modifica / elimina il selezionato, aggiorna le sessioni, apri o chiudi tutti i gruppi.
 .TP
 .B Tab
 Tab successivo e precedente, elenco dei tab aperti.
@@ -62,13 +73,13 @@ Sessioni del server (apri, sola lettura, congela, termina), Disconnetti, Congela
 Copia, Incolla.
 .TP
 .B Vista
-Carattere del terminale (anche la scelta tra i font a spaziatura fissa del sistema) e dimensione dell'interfaccia (ingrandisci, riduci, normale), barra dei menu, schermo intero.
+Carattere del terminale (anche la scelta tra i font a spaziatura fissa del sistema) e dimensione dell'interfaccia (ingrandisci, riduci, normale), barra dei server, pannello Attivita', barra dei menu, barra di stato, schermo intero.
 .TP
 .B Finestra
 Ingrandisci/ripristina, riduci a icona. I pulsanti di finestra sono anche a destra dei tab.
 .TP
 .B Aiuto
-Informazioni.
+Benvenuto, Guida rapida (F1), Informazioni.
 .SH SCORCIATOIE
 .TS
 l l.
@@ -93,6 +104,11 @@ Alt+Maiusc+Z	ingrandisce il pannello / li mostra tutti
 Alt+Maiusc+Spazio	disposizione successiva
 Alt+Maiusc+S	input sincronizzato su tutti i pannelli
 Alt+Maiusc+L	disposizioni salvate sul server
+Ctrl+Maiusc+B	mostra / nasconde la barra dei server
+Ctrl+Maiusc+J	mostra / nasconde il pannello Attivita'
+Ctrl+Maiusc+N	aggiungi server
+F11	schermo intero
+F1	guida rapida (fuori dal terminale)
 .TE
 .PP
 Su macOS \fICtrl+Maiusc\fR diventa \fI\[u2318]X\fR dove indicato nei menu. Il distacco di

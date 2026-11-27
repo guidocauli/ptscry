@@ -51,7 +51,10 @@ type sessionsDialog struct {
 	confirm             int // row waiting for the second click on "Termina", -1 none
 }
 
-func (g *gui) openSessionsDialog() {
+func (g *gui) openSessionsDialog() { g.openSessionsDialogFor("") }
+
+// openSessionsDialogFor opens the sessions of a server ("" = the current tab's).
+func (g *gui) openSessionsDialogFor(prof string) {
 	d := &sessionsDialog{g: g, confirm: -1}
 	g.setMu.Lock()
 	for _, p := range g.set.Profiles {
@@ -59,8 +62,11 @@ func (g *gui) openSessionsDialog() {
 	}
 	cur := g.set.Default
 	g.setMu.Unlock()
-	if g.active >= 0 && g.active < len(g.tabs) {
+	if g.active >= 0 && g.active < len(g.tabs) && !g.home {
 		cur = g.curTab().profile
+	}
+	if prof != "" {
+		cur = prof
 	}
 	d.profile.Value = cur
 	g.setDialog(d)
@@ -167,7 +173,7 @@ func (d *sessionsDialog) Layout(gtx layout.Context, g *gui) layout.Dimensions {
 				d.confirm = i
 			}
 		}
-		killLabel, killBg := "Termina", theme.bg
+		killLabel, killBg := "Termina", theme.input
 		if d.confirm == i {
 			killLabel, killBg = "Sicuro?", theme.warn
 		}
@@ -194,9 +200,9 @@ func (d *sessionsDialog) Layout(gtx layout.Context, g *gui) layout.Dimensions {
 					return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
 						layout.Rigid(g.smallButton(open, "Apri", theme.accent)),
 						layout.Rigid(layout.Spacer{Width: 8}.Layout),
-						layout.Rigid(g.smallButton(ro, "Sola lettura", theme.bg)),
+						layout.Rigid(g.smallButton(ro, "Sola lettura", theme.input)),
 						layout.Rigid(layout.Spacer{Width: 8}.Layout),
-						layout.Rigid(g.smallButton(frz, frzLabel, theme.bg)),
+						layout.Rigid(g.smallButton(frz, frzLabel, theme.input)),
 						layout.Rigid(layout.Spacer{Width: 8}.Layout),
 						layout.Rigid(g.smallButton(kill, killLabel, killBg)),
 					)
@@ -207,9 +213,9 @@ func (d *sessionsDialog) Layout(gtx layout.Context, g *gui) layout.Dimensions {
 	d.mu.Unlock()
 	kids = append(kids, g.row(gtx, func(gtx layout.Context) layout.Dimensions {
 		return layout.Flex{Axis: layout.Horizontal, Spacing: layout.SpaceStart}.Layout(gtx,
-			layout.Rigid(g.smallButton(&d.refresh, "Aggiorna", theme.bg)),
+			layout.Rigid(g.smallButton(&d.refresh, "Aggiorna", theme.input)),
 			layout.Rigid(layout.Spacer{Width: 8}.Layout),
-			layout.Rigid(g.smallButton(&d.close, "Chiudi", theme.bg)),
+			layout.Rigid(g.smallButton(&d.close, "Chiudi", theme.input)),
 		)
 	}))
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx, kids...)
@@ -224,6 +230,7 @@ func (g *gui) openSession(profile, name string, ro bool) {
 	for i, t := range tabs {
 		if t.profile == profile && t.session == name && t.ro == ro {
 			g.active = i
+			g.home, g.kbdSide = false, false
 			g.saveWorkspace()
 			return
 		}
@@ -299,7 +306,7 @@ func (d *workspacesDialog) Layout(gtx layout.Context, g *gui) layout.Dimensions 
 			}
 			d.confirm = i
 		}
-		delLabel, delBg := "Elimina", theme.bg
+		delLabel, delBg := "Elimina", theme.input
 		if d.confirm == i {
 			delLabel, delBg = "Sicuro?", theme.warn
 		}
@@ -327,7 +334,7 @@ func (d *workspacesDialog) Layout(gtx layout.Context, g *gui) layout.Dimensions 
 		g.row(gtx, g.field(&d.name, "lavoro")),
 		g.row(gtx, func(gtx layout.Context) layout.Dimensions {
 			return layout.Flex{Axis: layout.Horizontal, Spacing: layout.SpaceStart}.Layout(gtx,
-				layout.Rigid(g.smallButton(&d.close, "Chiudi", theme.bg)),
+				layout.Rigid(g.smallButton(&d.close, "Chiudi", theme.input)),
 				layout.Rigid(layout.Spacer{Width: 8}.Layout),
 				layout.Rigid(g.smallButton(&d.save, "Salva", theme.accent)),
 			)

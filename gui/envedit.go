@@ -95,7 +95,7 @@ func (e *envEditor) Layout(gtx layout.Context, g *gui) layout.Dimensions {
 					layout.Rigid(layout.Spacer{Width: 6}.Layout),
 					layout.Flexed(0.6, g.field(&r.value, "valore")),
 					layout.Rigid(layout.Spacer{Width: 6}.Layout),
-					layout.Rigid(g.smallButton(&r.del, "×", theme.bg)),
+					layout.Rigid(g.smallButton(&r.del, "×", theme.input)),
 				)
 			})
 		})
@@ -105,7 +105,7 @@ func (e *envEditor) Layout(gtx layout.Context, g *gui) layout.Dimensions {
 		layout.Rigid(layout.Spacer{Height: 6}.Layout),
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			gtx.Constraints.Min.X = 0
-			return layout.W.Layout(gtx, g.smallButton(&e.add, "+ Aggiungi variabile", theme.bg))
+			return layout.W.Layout(gtx, g.smallButton(&e.add, "+ Aggiungi variabile", theme.input))
 		}),
 	)
 }
@@ -155,9 +155,9 @@ func (d *envDialog) Layout(gtx layout.Context, g *gui) layout.Dimensions {
 		g.row(gtx, func(gtx layout.Context) layout.Dimensions { return d.ed.Layout(gtx, g) }),
 		g.row(gtx, func(gtx layout.Context) layout.Dimensions {
 			return layout.Flex{Axis: layout.Horizontal, Spacing: layout.SpaceStart}.Layout(gtx,
-				layout.Rigid(g.smallButton(&d.can, "Annulla", theme.bg)),
+				layout.Rigid(g.smallButton(&d.can, "Annulla", theme.input)),
 				layout.Rigid(layout.Spacer{Width: 8}.Layout),
-				layout.Rigid(g.smallButton(&d.save, "Salva", theme.bg)),
+				layout.Rigid(g.smallButton(&d.save, "Salva", theme.input)),
 				layout.Rigid(layout.Spacer{Width: 8}.Layout),
 				layout.Rigid(g.smallButton(&d.now, "Salva e applica ora", theme.accent)),
 			)

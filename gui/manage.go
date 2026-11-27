@@ -451,7 +451,7 @@ func (d *manageDialog) Layout(gtx layout.Context, g *gui) layout.Dimensions {
 				d.run(a)
 			}
 		}
-		label, bg := a.label, theme.bg
+		label, bg := a.label, theme.input
 		if d.confirm == i {
 			label, bg = "Sicuro?", theme.warn
 		}
@@ -471,9 +471,9 @@ func (d *manageDialog) Layout(gtx layout.Context, g *gui) layout.Dimensions {
 		}),
 		g.row(gtx, func(gtx layout.Context) layout.Dimensions {
 			return layout.Flex{Axis: layout.Horizontal, Spacing: layout.SpaceStart}.Layout(gtx,
-				layout.Rigid(g.smallButton(&d.clear, "Pulisci", theme.bg)),
+				layout.Rigid(g.smallButton(&d.clear, "Pulisci", theme.input)),
 				layout.Rigid(layout.Spacer{Width: 8}.Layout),
-				layout.Rigid(g.smallButton(&d.close, "Chiudi", theme.bg)),
+				layout.Rigid(g.smallButton(&d.close, "Chiudi", theme.input)),
 			)
 		}),
 	)

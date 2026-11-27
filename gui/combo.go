@@ -169,7 +169,7 @@ func (c *combo) Layout(gtx layout.Context, g *gui) layout.Dimensions {
 			return layout.Flex{Axis: layout.Horizontal, Alignment: layout.Middle}.Layout(gtx,
 				layout.Flexed(1, g.field(&c.ed, c.hint)),
 				layout.Rigid(layout.Spacer{Width: 4}.Layout),
-				layout.Rigid(g.smallButton(&c.toggle, " "+arrow+" ", theme.bg)),
+				layout.Rigid(g.smallButton(&c.toggle, " "+arrow+" ", theme.input)),
 			)
 		}),
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
@@ -192,7 +192,7 @@ func (c *combo) Layout(gtx layout.Context, g *gui) layout.Dimensions {
 				macro := material.List(g.th, &c.list)
 				return layout.Background{}.Layout(box,
 					func(gtx layout.Context) layout.Dimensions {
-						paint.FillShape(gtx.Ops, theme.bg, clip.Rect{Max: gtx.Constraints.Min}.Op())
+						paint.FillShape(gtx.Ops, theme.input, clip.Rect{Max: gtx.Constraints.Min}.Op())
 						return layout.Dimensions{Size: gtx.Constraints.Min}
 					},
 					func(gtx layout.Context) layout.Dimensions {
