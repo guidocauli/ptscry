@@ -420,7 +420,9 @@ func (g *gui) run(win *gioapp.Window) error {
 		}
 	}()
 	go func() { // cursor blink and the age of notices
-		for range time.Tick(530 * time.Millisecond) {
+		for { // on the edges of the blink phases (UnixMilli()/530), so that it blinks evenly
+			ms := time.Now().UnixMilli()
+			time.Sleep(time.Duration(530-ms%530+3) * time.Millisecond)
 			g.runOnUI(g.checkActivity)
 		}
 	}()

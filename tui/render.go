@@ -214,6 +214,9 @@ func prefixLabel(b byte) string {
 // the emulator's default) gets the terminal's own default (DECSCUSR 0), so
 // that the person's settings stay; client.conf "cursor" can force the blink.
 func (a *app) cursorStyle(shape int, blink bool) {
+	if shape < 0 || shape > 2 { // DECSCUSR 7 and up: not a shape
+		shape = 0
+	}
 	n := 0
 	if shape != 0 || !blink || a.cursorMode != "" {
 		switch a.cursorMode {

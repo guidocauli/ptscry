@@ -63,6 +63,13 @@ try:
     start("ptscry attach -l e2elay")
     check(wait_for("/4"), "attach -l opens the layout again (4 panes)")
     check(wait_for("SYNC-9"), "…with what the sessions printed")
+    # the cursor: what the program of the focused pane asks (DECSCUSR) reaches the real terminal
+    tm("pipe-pane", "-o", "-t", "t", f"cat > {TMP}/raw")
+    keys("printf '\\033[6 q'", "Enter"); time.sleep(1.2)
+    keys("printf '\\033[0 q'", "Enter"); time.sleep(1.2)
+    tm("pipe-pane", "-t", "t")
+    raw = open(f"{TMP}/raw", "rb").read()
+    check(b"\x1b[6 q" in raw and raw.rfind(b"\x1b[0 q") > raw.find(b"\x1b[6 q"), "the cursor shape asked in the pane reaches the terminal, and goes back to its default")
     keys("C-b", "s"); time.sleep(1.5)
     check(wait_for("ptscry - sessions"), "prefix s goes to the ptscry client of the pane (session list)")
     keys("Escape"); time.sleep(0.5)

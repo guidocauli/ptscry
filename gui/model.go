@@ -61,6 +61,9 @@ func (m *termModel) CursorShape() (shape int, blink bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	st, b := m.em.CursorStyle()
+	if st < 0 || st > 2 { // DECSCUSR 7 and up: not a shape
+		return 0, b
+	}
 	return int(st), b
 }
 
