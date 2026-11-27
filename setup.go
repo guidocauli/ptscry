@@ -13,6 +13,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
@@ -26,6 +27,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -73,8 +76,10 @@ func cmdSetup(args []string) error {
 }
 
 // setupConfig is the global configuration (groups, key directory).
-func setupConfig() (config, error) {
-	cf, err := parseConfigFile(configPath())
+func setupConfig() (config, error) { return setupConfigAt(configPath()) }
+
+func setupConfigAt(path string) (config, error) {
+	cf, err := parseConfigFile(path)
 	if err != nil {
 		return config{}, err
 	}
@@ -83,7 +88,7 @@ func setupConfig() (config, error) {
 
 func needRoot(what string) error {
 	if os.Getuid() != 0 {
-		return fmt.Errorf("only root can %s (sudo ptscry setup ...)", what)
+		return fmt.Errorf("only root can %s (sudo ptscry setup ..., or as a member of admin_group: ptscry admin setup ...)", what)
 	}
 	return nil
 }
@@ -95,9 +100,18 @@ func setupUsers(args []string) error {
 	if err != nil {
 		return err
 	}
+	return setupUsersTo(os.Stdout, g, args, true)
+}
+
+// setupUsersTo runs "setup users ..." writing to w; allowCreate = may make
+// local accounts (only root: an administrator of ptscry is not one of the system).
+func setupUsersTo(w io.Writer, g config, args []string, allowCreate bool) error {
+	if len(args) == 0 {
+		return errors.New(setupUsage)
+	}
 	switch args[0] {
 	case "list", "ls":
-		return usersList(os.Stdout, g)
+		return usersList(w, g)
 	case "add":
 		fs := flag.NewFlagSet("setup users add", flag.ContinueOnError)
 		admin := fs.Bool("admin", false, "also admin_group")
@@ -109,8 +123,11 @@ func setupUsers(args []string) error {
 		if fs.NArg() == 0 {
 			return errors.New("usage: ptscry setup users add [-admin] [-create] [-shell PATH] USER...")
 		}
+		if (*create || *shell != "") && !allowCreate {
+			return errors.New("creating system accounts needs root (sudo ptscry setup users add -create ...): an administrator of ptscry can only add existing users")
+		}
 		for _, u := range fs.Args() {
-			if err := userAdd(os.Stdout, g, u, *admin, *create, *shell); err != nil {
+			if err := userAdd(w, g, u, *admin, *create, *shell); err != nil {
 				return err
 			}
 		}
@@ -125,7 +142,7 @@ func setupUsers(args []string) error {
 			return errors.New("usage: ptscry setup users remove [-admin] USER...")
 		}
 		for _, u := range fs.Args() {
-			if err := userRemove(os.Stdout, g, u, *adminOnly); err != nil {
+			if err := userRemove(w, g, u, *adminOnly); err != nil {
 				return err
 			}
 		}
@@ -237,7 +254,9 @@ func userAdd(w io.Writer, g config, name string, admin, create bool, shell strin
 		if _, err := os.Stat(shell); err != nil {
 			return fmt.Errorf("shell %s: %v", shell, err)
 		}
-		if out, err := exec.Command("useradd", "-m", "-s", shell, name).CombinedOutput(); err != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		if out, err := exec.CommandContext(ctx, "useradd", "-m", "-s", shell, name).CombinedOutput(); err != nil {
 			return fmt.Errorf("useradd %s: %v %s", name, err, strings.TrimSpace(string(out)))
 		}
 		fmt.Fprintf(w, "account %s: created (set a password with: passwd %s, or give it a key: ptscry setup keys add %s ...)\n", name, name, name)
@@ -299,7 +318,11 @@ func groupChange(w io.Writer, grp, name string, add bool) error {
 		return fmt.Errorf("group %s is not a local group (FreeIPA/SSSD): change it there, for example: ipa %s %s --users=%s (then sss_cache -E)", grp, verb, grp, name)
 	}
 	flag := map[bool]string{true: "-a", false: "-d"}[add]
-	if out, err := exec.Command("gpasswd", flag, name, grp).CombinedOutput(); err != nil {
+	// with a limit: the monitor runs it for the administrators, and gpasswd waits
+	// on /etc/group.lock if something else holds it
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	if out, err := exec.CommandContext(ctx, "gpasswd", flag, name, grp).CombinedOutput(); err != nil {
 		return fmt.Errorf("gpasswd %s %s %s: %v %s", flag, name, grp, err, strings.TrimSpace(string(out)))
 	}
 	fmt.Fprintf(w, "%s: %s %s\n", name, map[bool]string{true: "added to", false: "removed from"}[add], grp)
@@ -313,6 +336,16 @@ func setupKeys(args []string) error {
 	if err != nil {
 		return err
 	}
+	return setupKeysTo(os.Stdout, g, args, os.Stdin, true)
+}
+
+// setupKeysTo runs "setup keys ..." writing to w; stdin is what "-" reads.
+// allowFiles = FILE may be a path (not through the monitor: root would read
+// any file for whoever asks).
+func setupKeysTo(w io.Writer, g config, args []string, stdin io.Reader, allowFiles bool) error {
+	if len(args) == 0 {
+		return errors.New(setupUsage)
+	}
 	if g.FrontendKeysDir == "none" {
 		return errors.New("frontend_authorized_keys_dir is none: the front-end takes no plain keys (certificates only)")
 	}
@@ -322,9 +355,9 @@ func setupKeys(args []string) error {
 			return errors.New("usage: ptscry setup keys list [USER]")
 		}
 		if len(args) == 2 {
-			return keysList(os.Stdout, g, args[1])
+			return keysList(w, g, args[1])
 		}
-		return keysListAll(os.Stdout, g)
+		return keysListAll(w, g)
 	case "add", "import":
 		if len(args) != 3 {
 			return errors.New("usage: ptscry setup keys add USER FILE|-|-home")
@@ -332,7 +365,7 @@ func setupKeys(args []string) error {
 		var src io.Reader
 		switch args[2] {
 		case "-":
-			src = os.Stdin
+			src = stdin
 		case "-home":
 			r, err := homeAuthorizedKeys(args[1])
 			if err != nil {
@@ -340,6 +373,9 @@ func setupKeys(args []string) error {
 			}
 			src = r
 		default:
+			if !allowFiles {
+				return errors.New("give the keys as text (-) or -home: a file is read by the client, not by the monitor")
+			}
 			f, err := os.Open(args[2])
 			if err != nil {
 				return err
@@ -347,16 +383,16 @@ func setupKeys(args []string) error {
 			defer f.Close()
 			src = f
 		}
-		n, err := keysAdd(os.Stdout, g, args[1], src)
+		n, err := keysAdd(w, g, args[1], src)
 		if err == nil && n == 0 {
-			fmt.Println("nothing new to add")
+			fmt.Fprintln(w, "nothing new to add")
 		}
 		return err
 	case "remove", "rm", "del":
 		if len(args) != 3 {
 			return errors.New("usage: ptscry setup keys remove USER N|SHA256:...")
 		}
-		return keysRemove(os.Stdout, g, args[1], args[2])
+		return keysRemove(w, g, args[1], args[2])
 	}
 	return fmt.Errorf("unknown command %q\n%s", args[0], setupUsage)
 }
@@ -463,17 +499,83 @@ func keysListAll(w io.Writer, g config) error {
 }
 
 // homeAuthorizedKeys opens the user's own ~/.ssh/authorized_keys.
+// homeAuthorizedKeys reads the user's ~/.ssh/authorized_keys as root: only a
+// regular file of that user (not a link: it could point to another user's
+// keys, or to any file), within the size of a key file.
 func homeAuthorizedKeys(name string) (io.Reader, error) {
 	u, err := user.Lookup(name)
 	if err != nil {
 		return nil, err
 	}
 	p := filepath.Join(u.HomeDir, ".ssh", "authorized_keys")
-	raw, err := os.ReadFile(p)
+	for _, q := range []string{filepath.Dir(p), p} {
+		fi, err := os.Lstat(q)
+		if err != nil {
+			return nil, err
+		}
+		st, ok := fi.Sys().(*syscall.Stat_t)
+		if fi.Mode()&os.ModeSymlink != 0 || !ok || strconv.FormatUint(uint64(st.Uid), 10) != u.Uid {
+			return nil, fmt.Errorf("%s must be the user's own (not a link): not read", q)
+		}
+	}
+	f, err := os.OpenFile(p, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
+	// again on what was opened: ~/.ssh may have been replaced by a link
+	// between the checks above and the open (O_NOFOLLOW covers only the last name)
+	fi, err := f.Stat()
+	if err != nil || !fi.Mode().IsRegular() {
+		return nil, fmt.Errorf("%s is not a regular file", p)
+	}
+	if st, ok := fi.Sys().(*syscall.Stat_t); !ok || strconv.FormatUint(uint64(st.Uid), 10) != u.Uid {
+		return nil, fmt.Errorf("%s must be the user's own: not read", p)
+	}
+	raw, err := io.ReadAll(io.LimitReader(f, feKeysMaxBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(raw) > feKeysMaxBytes {
+		return nil, fmt.Errorf("%s is too large", p)
+	}
 	return strings.NewReader(string(raw)), nil
+}
+
+// setupCaller is who asks the monitor for "admin setup".
+type setupCaller struct {
+	root bool
+	name string // the administrator (empty for root)
+}
+
+// runSetupForAdmin is "setup users|keys ..." asked through the monitor by root
+// or a member of admin_group (ptscry-gui, ptscry admin setup): run by the root
+// monitor, with the configuration it uses; no file paths (the client sends the
+// keys as text). An administrator who is not root has limits (adminSetupAllowed).
+func runSetupForAdmin(cfgPath string, args []string, text string, caller setupCaller) (string, error) {
+	if len(args) < 2 {
+		return "", errors.New("usage: admin setup users|keys ...")
+	}
+	g, err := setupConfigAt(cfgPath)
+	if err != nil {
+		return "", err
+	}
+	callerRoot := caller.root
+	if !callerRoot {
+		if err := adminSetupAllowed(g, args, caller.name); err != nil {
+			return "", err
+		}
+	}
+	var b strings.Builder
+	switch args[0] {
+	case "users", "user":
+		err = setupUsersTo(&b, g, args[1:], callerRoot)
+	case "keys", "key":
+		err = setupKeysTo(&b, g, args[1:], strings.NewReader(text), false)
+	default:
+		err = fmt.Errorf("admin setup: unknown part %q (users or keys)", args[0])
+	}
+	return b.String(), err
 }
 
 // keysAdd imports the valid public keys of src for the user; it returns how
@@ -816,4 +918,109 @@ func (wz *wizard) addKey(name string) {
 	if err == nil && n == 0 {
 		fmt.Fprintln(wz.out, "nessuna chiave nuova")
 	}
+}
+
+// adminSetupAllowed: what a member of admin_group (not root) may change.
+//   - only the parts admin_setup allows (default "users keys"; "no" = none);
+//   - never system accounts (uid below UID_MIN) nor root;
+//   - no keys for another administrator: a key lets its holder log in as that
+//     user through the front-end, so planting one for a peer would be a way to
+//     become them. Removing keys and users is always possible (it grants nothing).
+//
+// Giving a key to an ordinary user still lets the administrator log in as that
+// user: admin_group is for people trusted with that (MANUALE.md, admin setup).
+func adminSetupAllowed(g config, args []string, caller string) error {
+	part := args[0]
+	if part == "user" {
+		part = "users"
+	}
+	if part == "key" {
+		part = "keys"
+	}
+	allowed := false
+	for _, p := range strings.Fields(g.AdminSetup) {
+		allowed = allowed || p == part
+	}
+	if !allowed {
+		return fmt.Errorf("admin_setup = %q: the administrators cannot change the %s here (root can: sudo ptscry setup %s ...)", g.AdminSetup, part, part)
+	}
+	if len(args) < 2 {
+		return nil
+	}
+	verb := args[1]
+	for _, a := range args[2:] {
+		if part == "users" && (a == "-create" || a == "--create" || strings.HasPrefix(a, "-shell") || strings.HasPrefix(a, "--shell")) {
+			return errors.New("creating system accounts needs root (sudo ptscry setup users add -create ...): an administrator of ptscry can only add existing users")
+		}
+	}
+	var targets []string
+	switch {
+	case part == "users" && (verb == "add" || verb == "remove" || verb == "rm" || verb == "del"):
+		for _, a := range args[2:] {
+			if !strings.HasPrefix(a, "-") {
+				targets = append(targets, a)
+			}
+		}
+	case part == "keys" && (verb == "add" || verb == "import" || verb == "remove" || verb == "rm" || verb == "del") && len(args) > 2:
+		targets = []string{args[2]}
+	}
+	adding := verb == "add" || verb == "import"
+	for _, t := range targets {
+		if t == "root" {
+			return errors.New("root is not changed by an administrator")
+		}
+		u, err := user.Lookup(t)
+		if err != nil {
+			if adding {
+				return fmt.Errorf("user %s does not exist", t)
+			}
+			continue
+		}
+		uid, err := strconv.Atoi(u.Uid)
+		if err != nil {
+			return fmt.Errorf("user %s: uid %q", t, u.Uid)
+		}
+		if adding && uid < uidMin() {
+			return fmt.Errorf("%s is a system account (uid %d below UID_MIN %d): only root adds it (sudo ptscry setup ...)", t, uid, uidMin())
+		}
+		if part == "keys" && adding {
+			// a key for someone who can become root (sudo, wheel...) would be a
+			// way to become root: those stay root's to give
+			if id, err := lookupIdentityByName(t); err == nil {
+				for _, pg := range privilegedGroups {
+					if contains(id.groups, pg) {
+						return fmt.Errorf("%s is in the group %s (system administration): only root adds keys for them", t, pg)
+					}
+				}
+			}
+		}
+		if part == "keys" && adding && t != caller && g.AdminGroup != "" {
+			if members, _, err := groupMembers(g.AdminGroup); err == nil && contains(members, t) {
+				return fmt.Errorf("%s is an administrator too: only root (or %s themselves) adds keys for them", t, t)
+			}
+			if id, err := lookupIdentityByName(t); err == nil && contains(id.groups, g.AdminGroup) {
+				return fmt.Errorf("%s is an administrator too: only root (or %s themselves) adds keys for them", t, t)
+			}
+		}
+	}
+	return nil
+}
+
+// privilegedGroups are the usual groups of those who may become root.
+var privilegedGroups = []string{"root", "sudo", "wheel", "admin", "adm"}
+
+// uidMin is UID_MIN of /etc/login.defs (1000 if missing): below are system accounts.
+func uidMin() int {
+	b, err := os.ReadFile("/etc/login.defs")
+	if err == nil {
+		for _, l := range strings.Split(string(b), "\n") {
+			f := strings.Fields(l)
+			if len(f) == 2 && f[0] == "UID_MIN" {
+				if n, err := strconv.Atoi(f[1]); err == nil && n > 0 {
+					return n
+				}
+			}
+		}
+	}
+	return 1000
 }

@@ -32,7 +32,7 @@ const (
 )
 
 // opsWithText are the operations that carry hello.Text.
-var opsWithText = map[string]bool{"notify": true, "send-keys": true, "layout-set": true}
+var opsWithText = map[string]bool{"notify": true, "send-keys": true, "layout-set": true, "admin-setup": true}
 
 // cleanNotice keeps a notice to one line of printable text: no control
 // characters (escape sequences could drive the terminal of whoever reads

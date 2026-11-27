@@ -165,6 +165,11 @@ Chiude tutte le sessioni di un utente. Le azioni admin sono auditate con l'ident
 .B admin reexec
 Solo root. Sostituisce sul posto il binario del monitor (stesso pid, sessioni e connessioni SSH del front-end intatte); equivale a SIGUSR2. Prima verifica il nuovo binario con \fBmonitor \-t\fR; se fallisce non cambia nulla. Esito nell'audit (\fBmonitor_resumed\fR o \fBmonitor_reexec_failed\fR).
 .TP
+.B admin setup users \fR...\fB | keys \fR...
+Come \fBsetup users\fR e \fBsetup keys\fR, senza sudo per i membri di admin_group: le esegue il monitor, con i limiti di
+\fBadmin_setup\fR (ptscry.conf(5)): niente account di sistema ne' root, niente chiavi per chi puo' diventare root o per un
+altro amministratore. Il file di una chiave lo legge il client. Ogni operazione e' nell'audit (\fBadmin_setup\fR).
+.TP
 .B audit\-verify [\fIfile\fR...]
 Verifica numero di sequenza e catena di hash dell'audit. Piu' file, nell'ordine
 cronologico, sono verificati come un'unica catena (rotazione). Senza argomenti verifica

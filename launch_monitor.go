@@ -70,6 +70,29 @@ type launch struct {
 	once     sync.Once
 	followWG sync.WaitGroup
 	paused   bool
+	// closed when runLauncher has its answer (started, failed): the reaper
+	// waits for it, and then for the reader of the launcher's messages
+	startDone chan struct{}
+}
+
+// waitReader lets the reader of the launcher's messages take the "exit" it may
+// have already been sent (the launcher writes it and exits at once: its reaper
+// would otherwise record an unknown status, 255 for "ptscry run").
+func (l *launch) waitReader(max time.Duration) {
+	deadline := time.After(max)
+	if l.startDone != nil {
+		select {
+		case <-l.startDone:
+		case <-deadline:
+			return
+		}
+	}
+	done := make(chan struct{})
+	go func() { l.followWG.Wait(); close(done) }()
+	select {
+	case <-done:
+	case <-deadline:
+	}
 }
 
 // terminate hangs up the session's process group; stragglers are killed after
@@ -274,7 +297,7 @@ func (mh *mhost) onSpawn(p []byte) {
 		deny("server-wide session limit", "the server-wide session limit has been reached")
 		return
 	}
-	l := &launch{name: rq.Session}
+	l := &launch{name: rq.Session, startDone: make(chan struct{})}
 	mh.mu.Lock()
 	mh.launches[rq.Session] = l
 	mh.mu.Unlock()
@@ -323,6 +346,10 @@ func (mh *mhost) onSpawn(p []byte) {
 // session process is running (or why not). Afterwards a goroutine follows the
 // session until it ends.
 func (mh *mhost) runLauncher(l *launch, spec *launchSpec, slave *os.File) (pid int, started launchMsg, stage string, err error) {
+	if l.startDone != nil {
+		// after follow() (if started): its WaitGroup counts by then
+		defer close(l.startDone)
+	}
 	defer slave.Close()
 	fds, err := syscall.Socketpair(syscall.AF_UNIX, syscall.SOCK_SEQPACKET|syscall.SOCK_CLOEXEC, 0)
 	if err != nil {
@@ -353,6 +380,7 @@ func (mh *mhost) runLauncher(l *launch, spec *launchSpec, slave *os.File) (pid i
 	l.mu.Unlock()
 	go func() { // reap the launcher whatever happens
 		_ = cmd.Wait()
+		l.waitReader(3 * time.Second) // its "exit" first, if it sent one
 		l.finish(mh, -1, "launcher exited")
 	}()
 

@@ -150,6 +150,32 @@ func simpleOp(op string) func(d *manageDialog) ([]string, error) {
 	}
 }
 
+var keyRefRe = regexp.MustCompile(`^([0-9]{1,4}|SHA256:[A-Za-z0-9+/]{43})$`)
+
+// userArgs: "ptscry admin setup <part> <verb> [flags] USER [rest]"; an empty
+// string in pre marks where the user goes (else at the end, before rest).
+func userArgs(part, verb string, rest ...string) func(d *manageDialog) ([]string, error) {
+	return func(d *manageDialog) ([]string, error) {
+		u, err := needUser(d)
+		if err != nil {
+			return nil, err
+		}
+		a := []string{"admin", "setup", part, verb}
+		placed := false
+		for _, r := range rest {
+			if r == "" {
+				a, placed = append(a, u), true
+			} else {
+				a = append(a, r)
+			}
+		}
+		if !placed {
+			a = append(a, u)
+		}
+		return a, nil
+	}
+}
+
 func fixedArgs(args ...string) func(d *manageDialog) ([]string, error) {
 	return func(*manageDialog) ([]string, error) { return args, nil }
 }
@@ -202,6 +228,36 @@ var mgActions = []mgAction{
 			return nil, err
 		}
 		return []string{"check", "-u", u}, nil
+	}},
+	// who may use ptscry and the front-end keys: "ptscry admin setup", done by the
+	// root monitor for root and the members of admin_group (no sudo)
+	{page: "admin", section: "Utenti di ptscry", label: "Elenco degli utenti", about: "i membri del gruppo di accesso e di quello degli amministratori", cap: capAdmin, args: fixedArgs("admin", "setup", "users", "list")},
+	{page: "admin", section: "Utenti di ptscry", label: "Aggiungi l'utente", about: "l'utente scritto sopra entra nel gruppo di accesso (l'account deve esistere)", cap: capAdmin, args: userArgs("users", "add")},
+	{page: "admin", section: "Utenti di ptscry", label: "Aggiungi come amministratore", about: "nel gruppo di accesso e in quello degli amministratori", cap: capAdmin, args: userArgs("users", "add", "-admin")},
+	{page: "admin", section: "Utenti di ptscry", label: "Togli da amministratore", about: "resta utente, non più amministratore", cap: capAdmin, danger: true, args: userArgs("users", "remove", "-admin")},
+	{page: "admin", section: "Utenti di ptscry", label: "Togli l'utente", about: "non può più usare ptscry; le sue sessioni si chiudono al prossimo controllo", cap: capAdmin, danger: true, args: userArgs("users", "remove")},
+	{page: "admin", section: "Chiavi del front-end SSH", label: "Elenco delle chiavi", about: "dell'utente scritto sopra, o di tutti se è vuoto", cap: capAdmin, args: func(d *manageDialog) ([]string, error) {
+		a := []string{"admin", "setup", "keys", "list"}
+		if u := strings.TrimSpace(d.user.Text()); u != "" {
+			if !nameRe.MatchString(u) {
+				return nil, errors.New("nome dell'utente non valido")
+			}
+			a = append(a, u)
+		}
+		return a, nil
+	}},
+	{page: "admin", section: "Chiavi del front-end SSH", label: "Importa da un file…", about: "una chiave pubblica (.pub) scelta qui, per l'utente scritto sopra", cap: capAdmin, special: "keys-file"},
+	{page: "admin", section: "Chiavi del front-end SSH", label: "Importa dalle sue chiavi SSH", about: "dal suo ~/.ssh/authorized_keys (solo se è un suo file, non un collegamento)", cap: capAdmin, args: userArgs("keys", "add", "", "-home")},
+	{page: "admin", section: "Chiavi del front-end SSH", label: "Rimuovi la chiave", about: "la chiave scritta sopra (numero dell'elenco o SHA256:...) dell'utente", cap: capAdmin, danger: true, args: func(d *manageDialog) ([]string, error) {
+		u, err := needUser(d)
+		if err != nil {
+			return nil, err
+		}
+		k := strings.TrimSpace(d.keyRef.Text())
+		if !keyRefRe.MatchString(k) {
+			return nil, errors.New("scrivi la chiave da togliere: il numero dell'elenco o l'impronta SHA256:...")
+		}
+		return []string{"admin", "setup", "keys", "remove", u, k}, nil
 	}},
 	{page: "admin", section: "Interventi sull'utente", label: "Registra il TOTP", about: "nuovo segreto TOTP per l'utente (sostituisce il precedente)", cap: capAdmin, danger: true, args: func(d *manageDialog) ([]string, error) {
 		u, err := needUser(d)
@@ -276,6 +332,7 @@ type manageDialog struct {
 	name    widget.Editor
 	cmd     widget.Editor
 	user    widget.Editor
+	keyRef  widget.Editor // a front-end key: number in the list or SHA256:...
 	out     widget.Editor
 	btn     []widget.Clickable
 	close   widget.Clickable
@@ -299,7 +356,7 @@ func (g *gui) openManageDialog() {
 	d := &manageDialog{g: g, modes: map[string]string{}, btn: make([]widget.Clickable, len(mgActions)),
 		pageBtn: make([]widget.Clickable, len(mgPages)), page: "sess",
 		where: newCombo("server o computer su cui agire", "nessun profilo ptscry")}
-	d.name.SingleLine, d.cmd.SingleLine, d.user.SingleLine = true, true, true
+	d.name.SingleLine, d.cmd.SingleLine, d.user.SingleLine, d.keyRef.SingleLine = true, true, true, true
 	d.out.ReadOnly = true
 	var items []comboItem
 	g.setMu.Lock()
@@ -392,6 +449,26 @@ func (d *manageDialog) run(a mgAction) {
 	}
 	h := d.g.hubFor(prof)
 	var args []string
+	if a.special == "keys-file" {
+		// the file is chosen and read here, by this user (the CLI sends its text
+		// to the monitor, which reads no path)
+		u, err := needUser(d)
+		if err != nil {
+			d.show(err.Error())
+			return
+		}
+		go func() {
+			p, err := pickFile("Chiave pubblica di "+u+" (.pub)", "")
+			if err != nil || p == "" {
+				return
+			}
+			b := a
+			b.special = ""
+			b.args = fixedArgs("admin", "setup", "keys", "add", u, p)
+			d.g.runOnUI(func() { d.run(b) })
+		}()
+		return
+	}
 	if a.special == "" {
 		var err error
 		if args, err = a.args(d); err != nil {
@@ -623,9 +700,11 @@ func (d *manageDialog) Layout(gtx layout.Context, g *gui) layout.Dimensions {
 			kids = append(kids,
 				g.row(gtx, func(gtx layout.Context) layout.Dimensions {
 					return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
-						layout.Flexed(0.5, labeled(g, "Utente", g.field(&d.user, "nome dell'utente"))),
+						layout.Flexed(0.34, labeled(g, "Utente", g.field(&d.user, "nome dell'utente"))),
 						layout.Rigid(layout.Spacer{Width: 10}.Layout),
-						layout.Flexed(0.5, labeled(g, "Sessione (per Termina)", g.field(&d.name, "nome della sessione"))),
+						layout.Flexed(0.33, labeled(g, "Sessione (per Termina)", g.field(&d.name, "nome della sessione"))),
+						layout.Rigid(layout.Spacer{Width: 10}.Layout),
+						layout.Flexed(0.33, labeled(g, "Chiave (per Rimuovi)", g.field(&d.keyRef, "numero o SHA256:..."))),
 					)
 				}))
 			kids = append(kids, d.actionRows(gtx, g, mode, "admin")...)

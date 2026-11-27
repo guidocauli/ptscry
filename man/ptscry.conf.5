@@ -85,6 +85,12 @@ Non vale per il front-end SSH, dove anche root deve essere nel gruppo.
 .B admin_group = \fIgruppo\fB
 chi puo' usare \fBptscry admin\fR. Root puo' sempre.
 .TP
+.B admin_setup = users keys\fR|\fBusers\fR|\fBkeys\fR|\fBno
+cosa possono cambiare i membri di admin_group con \fBptscry admin setup\fR (e dalla GUI) senza sudo: gli utenti di
+ptscry, le chiavi del front-end, entrambi (default) o niente. Mai account di sistema (UID sotto UID_MIN), root, chiavi
+per membri di root/sudo/wheel/admin/adm o di un altro amministratore. Una chiave permette di entrare come quell'utente:
+le operazioni sono registrate nell'audit (\fBadmin_setup\fR).
+.TP
 .B max_total_sessions = \fIN\fB|unlimited\fR
 tetto alle sessioni di tutti gli utenti insieme (default 1024). Gli pseudoterminali
 sono una risorsa di sistema (\fBkernel.pty.max\fR).

@@ -58,6 +58,7 @@ type config struct {
 	AccessGroup   string // members may use ptscry (empty = everybody)
 	AllowRoot     bool   // root may use ptscry locally without being in AccessGroup (allow_root, default yes)
 	AdminGroup    string // members may use "admin" operations (root always may)
+	AdminSetup    string // what admin_group may change through the monitor: "users keys" (default), "users", "keys", "no"
 	// MaxTotalSessions caps the sessions of all users together (0 = unlimited):
 	// pseudoterminals are a system-wide resource (kernel.pty.max).
 	MaxTotalSessions int
@@ -95,6 +96,7 @@ func defaultConfig() config {
 		Record:        "off",
 		MonitorSocket: defaultMonitorSocket,
 		AllowRoot:     true,
+		AdminSetup:    "users keys",
 
 		RecordMaxBytes:   512 << 20,
 		MaxTotalSessions: 1024,
@@ -121,7 +123,7 @@ const defaultMonitorSocket = "/run/ptscry/monitor.sock"
 
 var globalOnly = map[string]bool{
 	"socket_dir": true, "audit_log": true, "audit_syslog": true, "audit_group": true, "record_dir": true,
-	"monitor_socket": true, "access_group": true, "admin_group": true, "allow_root": true,
+	"monitor_socket": true, "access_group": true, "admin_group": true, "admin_setup": true, "allow_root": true,
 	"max_total_sessions": true, "pam_service": true,
 	"frontend": true, "frontend_listen": true, "frontend_user": true, "frontend_host_key": true,
 	"frontend_ca_keys": true, "frontend_authorized_keys_dir": true, "frontend_require_fido2": true,
@@ -366,6 +368,19 @@ func (c *config) set(key, val string, scoped bool) error {
 		c.SocketDir = val
 	case "audit_log":
 		c.AuditLog = val
+	case "admin_setup":
+		v := strings.Join(strings.Fields(strings.ToLower(strings.ReplaceAll(val, ",", " "))), " ")
+		switch v {
+		case "users keys", "keys users":
+			v = "users keys"
+		case "users", "keys", "no", "none", "off":
+			if v == "none" || v == "off" {
+				v = "no"
+			}
+		default:
+			return fmt.Errorf("admin_setup wants users, keys, \"users keys\" or no")
+		}
+		c.AdminSetup = v
 	case "audit_group":
 		if val != "" && !pamNameRe.MatchString(val) {
 			return fmt.Errorf("audit_group: not a valid group name")

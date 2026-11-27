@@ -328,7 +328,7 @@ dice perché.
 |---|---|---|
 | Sessioni e job | a sinistra l'**elenco delle sessioni** del server (stato, client collegati, directory; *Aggiorna*), a destra la sessione scelta (clic nell'elenco o nome scritto) con Stato, Risultato del job (`wait`), Congela, Scongela e, a parte in rosso, Termina / scarta; sotto **Crea**: comando, Nuova sessione staccata (`new -d`), Esegui un job (`run -d`) | ovunque |
 | Host | Avvia l'host; Configurazione (`config`), Verifica (`check`), Elenco delle sessioni (`list`); Ferma l'host | Avvia: senza server; Configurazione e Verifica: questo computer; il resto ovunque |
-| Amministrazione | utente e sessione in alto; Sessioni di tutti, Verifica l'audit, Verifica l'utente (`check -u`); Registra il TOTP, Termina una sua sessione, Ferma il suo host; Sostituisci il monitor (`admin reexec`) | server locale, con root o `admin_group` |
+| Amministrazione | utente, sessione e chiave in alto; Sessioni di tutti, Verifica l'audit, Verifica l'utente (`check -u`); **Utenti di ptscry** (elenco, aggiungi, aggiungi come amministratore, togli) e **Chiavi del front-end SSH** (elenco, importa da un file scelto qui, importa dal suo `~/.ssh/authorized_keys`, rimuovi), con `ptscry admin setup` senza sudo (MANUALE.md, "Senza sudo, per gli amministratori"); Registra il TOTP, Termina una sua sessione, Ferma il suo host; Sostituisci il monitor (`admin reexec`) | server locale, con root o `admin_group` |
 | Servizio | Stato del servizio; Avvia, Rileggi la config, Riavvia, Ferma (`systemctl ... ptscry-monitor`, senza root con `pkexec`) | server locale, Linux |
 
 **Verifica** (`ptscry check`) per le sessioni senza server controlla un'installazione per un solo utente: binario e

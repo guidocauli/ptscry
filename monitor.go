@@ -89,6 +89,7 @@ type mhost struct {
 
 type monitor struct {
 	cfgPath string
+	setupMu sync.Mutex // admin-setup: one change of users/keys at a time
 	exe     string
 
 	cfgMu  sync.RWMutex
@@ -675,6 +676,15 @@ func validOpFields(hl *hello) error {
 			return errors.New("empty layout")
 		}
 	}
+	if hl.Op == "admin-setup" {
+		// "setup users|keys ...": the arguments in Cmd, the keys (if any) in Text
+		if len(hl.Cmd) < 2 || len(hl.Cmd) > 32 || (hl.Cmd[0] != "users" && hl.Cmd[0] != "keys") {
+			return errors.New("admin setup wants users|keys and their arguments")
+		}
+		if hl.Name != "" || hl.User != "" || len(hl.Env) > 0 || hl.ReadOnly || hl.Create || hl.Detached || hl.Job || hl.Remove {
+			return errors.New("unexpected fields in request")
+		}
+	}
 	switch hl.Op {
 	case "rename", "notify", "send-keys", "layout-set", "layout-get", "layout-list", "layout-del":
 		if len(hl.Cmd) > 0 || len(hl.Env) > 0 || hl.ReadOnly || hl.Create || hl.Detached || hl.Job || hl.Remove {
@@ -686,7 +696,7 @@ func validOpFields(hl *hello) error {
 
 func validHello(hl *hello) error {
 	switch hl.Op {
-	case "new", "attach", "list", "kill", "freeze", "thaw", "stop", "admin-list", "admin-kill", "admin-stop", "admin-reexec",
+	case "new", "attach", "list", "kill", "freeze", "thaw", "stop", "admin-list", "admin-kill", "admin-stop", "admin-reexec", "admin-setup",
 		"fe-keys", "fe-gate", "fe-totp", "fe-report",
 		"rename", "notify", "send-keys", "layout-set", "layout-get", "layout-list", "layout-del":
 	default:
@@ -1433,6 +1443,26 @@ func (m *monitor) handleAdmin(fc *framed, hl *hello, cred *syscall.Ucred, req ui
 			h.mu.Unlock()
 		}
 		_ = replyOK(fc, okReply{Sessions: out})
+
+	case "admin-setup":
+		// who may use ptscry and the front-end keys, for the administrators
+		// too (not only with sudo): done by this root process, one at a time
+		m.setupMu.Lock()
+		out, err := runSetupForAdmin(m.cfgPath, hl.Cmd, hl.Text, setupCaller{root: uid == 0, name: who})
+		m.setupMu.Unlock()
+		f := fields{"req": req, "admin_uid": uid, "admin": who, "args": clip(strings.Join(hl.Cmd, " "), 512), "ok": err == nil}
+		if len(hl.Cmd) > 1 && hl.Cmd[0] == "keys" && hl.Cmd[1] != "list" && hl.Cmd[1] != "ls" {
+			f["result"] = clip(out, 1024) // the fingerprints added or removed
+		}
+		if err != nil {
+			f["error"] = clip(err.Error(), 512)
+		}
+		m.audit.log("admin_setup", f)
+		if err != nil {
+			replyErr(fc, strings.TrimSpace(out+"\n"+err.Error()))
+			return
+		}
+		_ = replyOK(fc, okReply{Message: "done", Text: out})
 
 	case "admin-reexec":
 		if uid != 0 {

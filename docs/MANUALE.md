@@ -476,6 +476,23 @@ l'account `ptscry-fe` e la chiave host, mette `frontend = yes` in `[global]` (la
 di sostituire la vecchia, che resta come `.bak`), ricarica il monitor e dice quale porta aprire nel firewall. Il messaggio
 "connection refused" / "actively refused" nel client significa proprio che il front-end non e' attivo (o la porta e' un'altra).
 
+**Senza sudo, per gli amministratori: `ptscry admin setup`** (e ptscry-gui, Gestione ptscry → Amministrazione). I membri di
+`admin_group` fanno le stesse operazioni su utenti e chiavi: `ptscry admin setup users add anna`, `ptscry admin setup keys add
+mario mario.pub`, ecc. Le esegue il monitor (root), una alla volta, e ognuna finisce nell'audit (`admin_setup`, con chi l'ha
+chiesta, gli argomenti e, per le chiavi, le impronte). Il file della chiave lo legge il client, con i permessi di chi lo lancia:
+il monitor non apre percorsi per conto d'altri. Limiti per chi non e' root:
+
+- niente account di sistema: `-create`/`-shell` restano di root, e non si aggiungono utenti con UID sotto `UID_MIN`
+  (`/etc/login.defs`, di solito 1000) ne' root;
+- niente chiavi per chi puo' diventare root (gruppi `root`, `sudo`, `wheel`, `admin`, `adm`) ne' per un altro amministratore
+  (solo per se stessi): una chiave permette a chi ha la privata di entrare **come quell'utente** dal front-end;
+- `~/.ssh/authorized_keys` (`-home`) si legge solo se e' un file dell'utente, non un collegamento;
+- togliere utenti e chiavi e' sempre possibile (non concede nulla).
+
+Attenzione: un amministratore che aggiunge una chiave per un utente qualsiasi puo' poi entrare come lui dal front-end. Dai
+`admin_group` solo a chi puo' avere questa fiducia, oppure limita con **`admin_setup`** in `[global]`: `users keys`
+(predefinito), `users` (le chiavi restano di root), `keys`, `no`.
+
 I gruppi locali si cambiano con `gpasswd`; se `access_group` viene da FreeIPA/SSSD il comando non lo tocca e dice il comando
 `ipa group-add-member` da usare. Le chiavi vanno in `frontend_authorized_keys_dir` (file root 0644, scrittura atomica):
 vengono rifiutate le chiavi private, i doppioni e le righe con opzioni che il front-end non saprebbe rispettare.

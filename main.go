@@ -75,6 +75,9 @@ Administration (root, or members of admin_group):
   ptscry setup frontend        turn the SSH front-end on (account, host key, config, reload)
   ptscry setup users list | add [-admin] [-create] USER... | remove [-admin] USER...
   ptscry setup keys list [USER] | add USER FILE|-|-home | remove USER N|SHA256:...
+  ptscry admin setup users ... | keys ...
+                               the same as "setup users/keys", without sudo for members of admin_group:
+                               the monitor does it (creating system accounts, -create, stays root only)
 
 Development:
   ptscry frontend              SSH front-end (started by the monitor, not by hand)

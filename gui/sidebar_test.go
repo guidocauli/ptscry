@@ -292,3 +292,11 @@ func TestSetOpenKeys(t *testing.T) {
 		t.Errorf("server under Preferiti: %v", g.side.sess)
 	}
 }
+
+func TestValidSessions(t *testing.T) {
+	in := []sessInfo{{Name: "ok"}, {Name: "-x"}, {Name: "a b"}, {Name: "main", Cwd: "/home/x\x1b[31m"}}
+	out := validSessions(in)
+	if len(out) != 2 || out[0].Name != "ok" || out[1].Name != "main" || strings.ContainsRune(out[1].Cwd, 0x1b) {
+		t.Errorf("validSessions = %+v", out)
+	}
+}

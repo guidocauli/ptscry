@@ -376,7 +376,26 @@ func (t *Term) Wait() Result { return result(t.s.Wait()) }
 // Close ends the terminal; the session stays alive on the server (it detaches).
 func (t *Term) Close() { t.closed.Do(func() { t.s.Close() }) }
 
-func readFile(p string) ([]byte, error) { return os.ReadFile(p) }
+// readFile reads a key or certificate file: a regular file of at most 1 MiB
+// (a path from an imported configuration could name /dev/zero or a fifo).
+func readFile(p string) ([]byte, error) {
+	f, err := os.Open(p)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	if fi, err := f.Stat(); err != nil || !fi.Mode().IsRegular() {
+		return nil, fmt.Errorf("%s: not a regular file", p)
+	}
+	b, err := io.ReadAll(io.LimitReader(f, 1<<20+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(b) > 1<<20 {
+		return nil, fmt.Errorf("%s: too large for a key", p)
+	}
+	return b, nil
+}
 
 // defaultKeySigners loads the keys ssh itself would try: ~/.ssh/id_ed25519,
 // id_ecdsa, id_rsa. An encrypted key asks for its passphrase; a wrong or empty
@@ -389,7 +408,7 @@ func defaultKeySigners(prompt Prompter) []ssh.Signer {
 	var out []ssh.Signer
 	for _, n := range []string{"id_ed25519", "id_ecdsa", "id_rsa"} {
 		path := filepath.Join(home, ".ssh", n)
-		raw, err := os.ReadFile(path)
+		raw, err := readFile(path)
 		if err != nil {
 			continue
 		}

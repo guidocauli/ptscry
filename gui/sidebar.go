@@ -246,6 +246,19 @@ func (g *gui) treeSessions(prof string) *sessCache {
 	return &cp
 }
 
+// validSessions drops what a server answered with a name ptscry cannot have
+// (it would end up in a command line: "-x" would be an option).
+func validSessions(list []sessInfo) []sessInfo {
+	out := list[:0:0]
+	for _, s := range list {
+		if nameRe.MatchString(s.Name) {
+			s.Cwd = cleanLine(s.Cwd, 300)
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
 // cachedSessions are the sessions already read, without reading them again.
 func (g *gui) cachedSessions(prof string) *sessCache {
 	g.side.mu.Lock()

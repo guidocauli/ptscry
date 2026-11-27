@@ -38,7 +38,8 @@ func parseSessions(b []byte) []sessInfo {
 	if json.Unmarshal(b, &v) != nil {
 		return nil
 	}
-	return v.Sessions
+	// every user of the list (tree, dialogs, Gestione) gets only valid names
+	return validSessions(v.Sessions)
 }
 
 // sessions lists the sessions of the profile. With connect false it does not

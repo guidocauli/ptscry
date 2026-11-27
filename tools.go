@@ -10,6 +10,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"text/tabwriter"
@@ -97,14 +98,39 @@ func cmdAdmin(args []string) error {
 		hl = hello{Op: "admin-stop", User: args[1]}
 	case args[0] == "reexec" && len(args) == 1:
 		hl = hello{Op: "admin-reexec"}
+	case args[0] == "setup" && len(args) >= 3:
+		// as "ptscry setup users|keys ...", without sudo for admin_group: the
+		// monitor does it; a key file is read here, by the caller
+		hl = hello{Op: "admin-setup", Cmd: args[1:]}
+		if (args[1] == "keys" || args[1] == "key") && (args[2] == "add" || args[2] == "import") && len(args) == 5 && args[4] != "-home" {
+			var raw []byte
+			var err error
+			if args[4] == "-" {
+				raw, err = io.ReadAll(io.LimitReader(os.Stdin, maxOpText+1))
+			} else {
+				raw, err = os.ReadFile(args[4])
+			}
+			if err != nil {
+				return err
+			}
+			if len(raw) > maxOpText {
+				return fmt.Errorf("too many keys at once (at most %d bytes)", maxOpText)
+			}
+			hl.Cmd = append(append([]string{}, args[1:4]...), "-")
+			hl.Text = string(raw)
+		}
 	default:
-		return errors.New("usage: ptscry admin list | kill <user> <session> | stop <user> | reexec")
+		return errors.New("usage: ptscry admin list | kill <user> <session> | stop <user> | reexec | setup users|keys ...")
 	}
 	fc, r, err := connect(hl, false)
 	if err != nil {
 		return err
 	}
 	fc.c.Close()
+	if hl.Op == "admin-setup" {
+		fmt.Print(r.Text)
+		return nil
+	}
 	if hl.Op != "admin-list" {
 		fmt.Println(r.Message)
 		return nil
