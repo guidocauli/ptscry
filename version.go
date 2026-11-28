@@ -8,7 +8,7 @@ import "fmt"
 
 const (
 	progName    = "ptscry"
-	progVersion = "0.7.2"
+	progVersion = "0.7.3"
 	progCredits = "Guido Cauli <guido.cauli@gmail.com>"
 	progTagline = "persistent audited PTY sessions"
 )

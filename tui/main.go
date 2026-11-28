@@ -23,7 +23,7 @@ import (
 	"ptscry/internal/rclient"
 )
 
-const tuiVersion = "0.7.2-tui"
+const tuiVersion = "0.7.3-tui"
 
 const usage = `ptscry-tui - Guido Cauli <guido.cauli@gmail.com>
   sessions of ptscry in panes (version ` + tuiVersion + `)

@@ -1,6 +1,6 @@
 # ptscry - Guido Cauli <guido.cauli@gmail.com>
 
-# Manuale di amministrazione (versione 0.7.2)
+# Manuale di amministrazione (versione 0.7.3)
 
 Questo manuale e' per chi installa e gestisce ptscry. Per i comandi vedi `man ptscry`, per
 le chiavi di configurazione `man ptscry.conf`, per il modello di sicurezza e la mappatura
@@ -84,7 +84,8 @@ front-end, per i limiti e l'audit.
 
 ### 2.1 Con i pacchetti (consigliato)
 
-`./build-server.sh` (serve nfpm) produce in `dist-server/` i pacchetti del server:
+Nelle release i pacchetti del server sono in `ptscry-VERSIONE-server-linux.tar.gz`, una directory per architettura
+(`ptscry-VERSIONE/amd64/`, `arm64/`). `./build-server.sh` (serve nfpm) produce in `dist-server/` gli stessi pacchetti:
 
 | Sistema | Pacchetto | Comando |
 |---|---|---|

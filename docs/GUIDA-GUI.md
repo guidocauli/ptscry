@@ -13,13 +13,15 @@ rete. Alla riapertura il tab si riattacca e ritrovi tutto com'era (programmi com
 
 ## 2. Installare
 
-Il modo piu' semplice e' l'**installer** del proprio sistema:
+Il modo piu' semplice e' l'**installer** del proprio sistema. Nelle release c'e' un archivio per sistema
+(`ptscry-VERSIONE-gui-linux.tar.gz`, `-gui-windows.zip`, `-gui-macos.zip`) con una directory per architettura: `amd64`
+(Intel/AMD a 64 bit) e `arm64` (ARM a 64 bit, Apple Silicon); i file qui sotto sono li' dentro.
 
 | Sistema | File | Come |
 |---|---|---|
 | Windows | `ptscry-gui-setup-windows-amd64.exe` (o `-arm64`) | doppio clic; si sceglie "solo per me" (senza amministratore) o "per tutti"; voce nel menu Start, icona sul desktop e PATH facoltativi; si disinstalla da Impostazioni → App |
-| Debian, Ubuntu | `ptscry-gui_VERSIONE-1_amd64.deb` | `sudo apt install ./ptscry-gui_*.deb` (rimozione: `sudo apt remove ptscry-gui`) |
-| Fedora, Alma, RHEL, openSUSE | `ptscry-gui-VERSIONE-1.x86_64.rpm` | `sudo dnf install ./ptscry-gui-*.rpm` (o `zypper install`) |
+| Debian, Ubuntu | `ptscry-gui_VERSIONE-1_amd64.deb` (o `_arm64`) | `sudo apt install ./ptscry-gui_*.deb` (rimozione: `sudo apt remove ptscry-gui`) |
+| Fedora, Alma, RHEL, openSUSE | `ptscry-gui-VERSIONE-1.x86_64.rpm` (o `.aarch64`) | `sudo dnf install ./ptscry-gui-*.rpm` (o `zypper install`) |
 | macOS | `ptscry-gui-macos-ARCH.dmg` | si apre e si trascina ptscry-gui in Applicazioni |
 
 I pacchetti Linux mettono il programma in `/usr/lib/ptscry-gui`, il comando `ptscry-gui` in `/usr/bin`, la voce nel menu,

@@ -6,8 +6,10 @@
 # to a DRAFT release: nothing is published until you press "Publish".
 #   server:  deb / rpm / tar, amd64 and arm64, built natively in AlmaLinux 9
 #            (glibc 2.34: the binaries run on RHEL/Alma 9, Debian 12+, Ubuntu 22.04+)
-#   GUI:     Linux deb / rpm / tar, Windows setup + zip (amd64, arm64), macOS dmg
+#   GUI:     Linux deb / rpm / tar, Windows setup + zip, macOS dmg + tar (amd64, arm64)
 #   sources: tar.gz of the tag
+# The packages are grouped by system (install/bundle.sh): one archive per system,
+# ptscry-VERSION/<arch>/ inside, e.g. ptscry-0.7.3-gui-linux.tar.gz.
 # The release notes come from docs/release-notes/<tag>.md when it exists.
 
 name: release
@@ -63,8 +65,15 @@ jobs:
           if-no-files-found: error
 
   gui-linux:
-    name: GUI Linux amd64
-    runs-on: ubuntu-latest
+    name: GUI Linux ${{ matrix.arch }}
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
     container: almalinux:9
     steps:
       - name: build tools
@@ -87,7 +96,7 @@ jobs:
           PATH="$PATH:$(go env GOPATH)/bin" ./build-gui.sh linux
       - uses: actions/upload-artifact@v4
         with:
-          name: gui-linux
+          name: gui-linux-${{ matrix.arch }}
           path: |
             dist-gui/*.deb
             dist-gui/*.rpm
@@ -161,9 +170,11 @@ jobs:
         run: |
           TAG="${{ github.event.inputs.tag || github.ref_name }}"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          mkdir -p out
-          find art -type f -exec cp {} out/ \;
-          git archive --format=tar.gz --prefix=ptscry/ -o "out/ptscry-${TAG#v}-src.tar.gz" HEAD
+          mkdir -p flat out
+          find art -type f -exec cp {} flat/ \;
+          # one archive per system, an architecture per directory
+          bash install/bundle.sh "${TAG#v}" flat out
+          git archive --format=tar.gz --prefix=ptscry-${TAG#v}/ -o "out/ptscry-${TAG#v}-src.tar.gz" HEAD
           (cd out && sha256sum * > SHA256SUMS)
           if [ -f "docs/release-notes/$TAG.md" ]; then
             cp "docs/release-notes/$TAG.md" notes.md
