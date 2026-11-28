@@ -31,6 +31,7 @@ const (
 	ctlRecAck   byte = 'A' // JSON {session, ok, error, file}
 	ctlSpawned  byte = 'P' // JSON spawnReply (+ fd of the terminal master when ok)
 	ctlExited   byte = 'Z' // JSON {session, code}: the session's process ended
+	ctlByeAck   byte = 'b' // no payload: after this, no more clients for the host
 
 	// host -> monitor
 	ctlEvent     byte = 'E' // JSON {event, fields}
@@ -40,6 +41,7 @@ const (
 	ctlRecClose  byte = 'X' // session name
 	ctlSpawn     byte = 'W' // JSON launchRequest: start a session process
 	ctlKillSess  byte = 'T' // JSON {session}: end a session's process (monitor signals it)
+	ctlBye       byte = 'B' // no payload: the host is ending, send no more clients
 )
 
 const (

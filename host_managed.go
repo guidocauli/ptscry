@@ -103,6 +103,7 @@ func runManagedHost() error {
 		sessions: map[string]*session{}, done: make(chan struct{}),
 		emptySince: time.Now(),
 		spawns:     map[string]chan spawnResult{}, exits: map[string]chan int{},
+		byeAck: make(chan struct{}),
 	}
 	h.audit.log("host_start", fields{"pid": os.Getpid(), "lifecycle": h.cfg.Lifecycle,
 		"version": progVersion, "mode": "managed"})
@@ -119,6 +120,7 @@ func runManagedHost() error {
 
 	<-h.done
 	h.drainClients()
+	h.goodbye()
 	h.audit.log("host_stop", fields{"pid": os.Getpid()})
 	return nil
 }
@@ -137,7 +139,11 @@ func (h *host) ctlLoop() {
 			if f == nil {
 				continue
 			}
-			go h.handoff(p, f)
+			h.active.Add(1) // counted now: drainClients must not miss it
+			go func() {
+				defer h.active.Add(-1)
+				h.handoff(p, f)
+			}()
 		case ctlKill:
 			var m struct{ Session, Reason string }
 			if json.Unmarshal(p, &m) == nil {
@@ -149,6 +155,8 @@ func (h *host) ctlLoop() {
 			var m struct{ Reason string }
 			_ = json.Unmarshal(p, &m)
 			go h.shutdown("monitor: " + m.Reason)
+		case ctlByeAck:
+			h.byeOnce.Do(func() { close(h.byeAck) })
 		case ctlSpawned:
 			h.onSpawned(p, f)
 		case ctlExited:
@@ -171,6 +179,21 @@ func (h *host) ctlLoop() {
 			f.Close()
 		}
 	}
+}
+
+// goodbye tells the monitor that this host is ending and waits for its
+// acknowledgement: the clients it handed over in the meantime are answered
+// (the host is closing: the client retries and reaches a new host) instead of
+// being lost with the control socket.
+func (h *host) goodbye() {
+	if err := h.ctl.send(ctlBye, nil); err != nil {
+		return
+	}
+	select {
+	case <-h.byeAck:
+	case <-time.After(3 * time.Second): // an older monitor: it does not answer
+	}
+	h.drainClients()
 }
 
 // handoff serves a client connection passed by the monitor.

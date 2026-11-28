@@ -17,7 +17,7 @@ CONF = os.path.join(ROOT, "ptscry.conf")
 MLOG = os.path.join(ROOT, "monitor.out")
 
 USERS = ["pt_alice", "pt_bob", "pt_carol", "pt_dave", "pt_erin", "pt_frank"]
-GROUPS = ["ptscry_t", "ptadmin_t", "unl_t"]
+GROUPS = ["ptscry_t", "ptadmin_t", "unl_t", "ptroot_t"]
 PAM_MODE = os.environ.get("PTSCRY_E2E_PAM", "on")      # "off" re-runs the suite on the legacy direct path
 PAM_SVC = "ptscry_t"
 PAM_FILE = "/etc/pam.d/" + PAM_SVC
@@ -139,7 +139,7 @@ try:
     for g in GROUPS: sh("groupadd", "-f", g)
     for u in USERS: sh("useradd", "-m", "-s", "/bin/bash", u)
     for u in ["pt_alice", "pt_bob", "pt_dave", "pt_erin"]: sh("usermod", "-aG", "ptscry_t", u)
-    sh("usermod", "-aG", "ptadmin_t", "pt_bob"); sh("usermod", "-aG", "unl_t", "pt_erin")
+    sh("usermod", "-aG", "ptadmin_t", "pt_bob"); sh("usermod", "-aG", "unl_t", "pt_erin"); sh("usermod", "-aG", "ptroot_t", "pt_dave")
     if PAM_MODE != "off":
         open(LIMITS, "w").write("pt_alice hard nofile 500\npt_alice soft nofile 400\npt_alice hard nproc 321\n"); os.chmod(LIMITS, 0o644)
         open(PAM_FILE, "w").write(f"""#%PAM-1.0
@@ -313,9 +313,35 @@ session  required  pam_limits.so conf={LIMITS}
     r = as_user("pt_bob", ["admin", "setup", "keys", "add", "daemon", os.path.join(kd, "id.pub")])
     check(r.returncode != 0 and "system account" in r.stderr, "admin setup: no keys for system accounts")
     sh("usermod", "-aG", "ptadmin_t", "pt_erin")
+    # who is in sudo, docker or admin_group is root's business (Unix): no extra checks on the keys
     r = as_user("pt_bob", ["admin", "setup", "keys", "add", "pt_erin", os.path.join(kd, "id.pub")])
-    check(r.returncode != 0 and "administrator too" in r.stderr, "admin setup: no keys for another administrator")
+    check(r.returncode == 0 and "added" in r.stdout, "admin setup: keys for another administrator (no extra group checks)")
+    as_user("pt_bob", ["admin", "setup", "keys", "remove", "pt_erin", "1"])
+    # but not who administers ptscry
+    r = as_user("pt_bob", ["admin", "setup", "users", "add", "-admin", "pt_carol"])
+    check(r.returncode != 0 and "admin_root_groups" in r.stderr and "pt_carol" not in sh("getent", "group", "ptadmin_t").stdout,
+          "admin setup: an administrator cannot make administrators")
+    r = as_user("pt_bob", ["admin", "setup", "users", "remove", "pt_erin"])
+    check(r.returncode != 0 and "administrator of ptscry" in r.stderr and "pt_erin" in sh("getent", "group", "ptadmin_t").stdout,
+          "admin setup: an administrator cannot remove another administrator")
     sh("gpasswd", "-d", "pt_erin", "ptadmin_t")
+    # admin_root_groups: root's authority on ptscry (e.g. a group from LDAP/FreeIPA)
+    r = as_user("pt_dave", ["admin", "list"])
+    check(r.returncode != 0, "pt_dave is not an administrator yet")
+    write_conf(f"frontend_authorized_keys_dir = {FEK}\nadmin_root_groups = ptroot_t\n"); mon.send_signal(signal.SIGHUP); time.sleep(1.2)
+    r = as_user("pt_dave", ["admin", "list"])
+    check(r.returncode == 0, "admin_root_groups: a member uses the admin operations")
+    r = as_user("pt_dave", ["admin", "setup", "users", "add", "-admin", "pt_carol"])
+    check(r.returncode == 0 and "pt_carol" in sh("getent", "group", "ptadmin_t").stdout, "admin_root_groups: a member makes administrators")
+    check(has_event("admin_setup", admin="pt_dave", root_authority=True, ok=True), "admin_root_groups: audited with root_authority")
+    r = as_user("pt_dave", ["admin", "setup", "users", "remove", "-admin", "pt_carol"])
+    check(r.returncode == 0 and "pt_carol" not in sh("getent", "group", "ptadmin_t").stdout, "admin_root_groups: a member removes administrators")
+    as_user("pt_dave", ["admin", "setup", "users", "remove", "pt_carol"])
+    r = as_user("pt_bob", ["admin", "setup", "users", "remove", "pt_dave"])
+    check(r.returncode != 0 and "pt_dave" in sh("getent", "group", "ptscry_t").stdout, "admin setup: admin_group cannot remove a member of admin_root_groups")
+    write_conf(f"frontend_authorized_keys_dir = {FEK}\n"); mon.send_signal(signal.SIGHUP); time.sleep(1.2)
+    r = as_user("pt_dave", ["admin", "list"])
+    check(r.returncode != 0, "admin_root_groups removed: pt_dave is no longer an administrator")
     write_conf(f"frontend_authorized_keys_dir = {FEK}\nadmin_setup = users\n")
     r = as_user("pt_bob", ["admin", "setup", "keys", "list"])
     check(r.returncode != 0 and "admin_setup" in r.stderr, "admin_setup = users: the keys stay root's")
@@ -471,9 +497,13 @@ print(denied, ok)
     # the exit status must never be lost: the launcher writes it and exits at
     # once, and its reaper used to record "unknown" (255) first, now and then
     bad = []
-    for i in range(20):
+    for i in range(int(os.environ.get("RUN_LOOPS", "20"))):
         x = as_user("pt_alice", ["run", "-q", "sh", "-c", "exit 7"])
-        if x.returncode != 7: bad.append(x.returncode)
+        if i >= 20: time.sleep(0.25)  # long runs (RUN_LOOPS): stay under the rate limit
+        if x.returncode != 7:
+            bad.append((x.returncode, x.stderr.strip()[-160:]))
+            if os.environ.get("RUN_DEBUG"):
+                time.sleep(1); print("DEBUG", [ (e["event"], e.get("session"), e.get("reason"), e.get("error")) for e in events()[-12:]])
     check(not bad, f"run: the exit status of 20 quick jobs in a row is never lost ({bad})")
     if r.returncode != 7:  # say why (-q hides it)
         r2 = as_user("pt_alice", ["run", "sh", "-c", "echo JOB-OUT; exit 7"])
@@ -601,8 +631,9 @@ print(denied, ok)
     as_user("pt_erin", ["new", "-d", "-n", "rv"])
     check(len(host_pids("pt_erin")) == 1, "erin has a running host before the revocation")
     write_conf(tail="[user:pt_erin]\nenabled = no")
-    mon.send_signal(signal.SIGHUP); time.sleep(3.0)
-    check(host_pids("pt_erin") == [], "disabling a user by policy ends their running sessions")
+    mon.send_signal(signal.SIGHUP); t0 = time.time()
+    while host_pids("pt_erin") and time.time() - t0 < 8: time.sleep(0.1)
+    check(host_pids("pt_erin") == [], f"disabling a user by policy ends their running sessions ({time.time() - t0:.1f}s)")
     check(has_event("policy_revoked", user="pt_erin"), "the revocation is audited")
     write_conf(); mon.send_signal(signal.SIGHUP); time.sleep(0.8)
     check(as_user("pt_erin", ["new", "-d", "-n", "back"]).returncode == 0, "the user can work again after the policy is restored")

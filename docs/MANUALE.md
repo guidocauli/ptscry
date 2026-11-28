@@ -480,20 +480,25 @@ di sostituire la vecchia, che resta come `.bak`), ricarica il monitor e dice qua
 `admin_group` fanno le stesse operazioni su utenti e chiavi: `ptscry admin setup users add anna`, `ptscry admin setup keys add
 mario mario.pub`, ecc. Le esegue il monitor (root), una alla volta, e ognuna finisce nell'audit (`admin_setup`, con chi l'ha
 chiesta, gli argomenti e, per le chiavi, le impronte). Il file della chiave lo legge il client, con i permessi di chi lo lancia:
-il monitor non apre percorsi per conto d'altri. Limiti per chi non e' root:
+il monitor non apre percorsi per conto d'altri.
 
-- niente account di sistema: `-create`/`-shell` restano di root, e non si aggiungono utenti con UID sotto `UID_MIN`
-  (`/etc/login.defs`, di solito 1000) ne' root;
-- niente chiavi per chi puo' diventare root o leggere/cambiare cio' che e' di root: gruppi `root`, `sudo`, `wheel`, `admin`,
-  `adm`, `docker`, `lxd`, `incus-admin`, `libvirt`, `disk`, `shadow`, oppure qualunque diritto in sudoers (`sudo -l -U`),
-  ne' per un altro amministratore
-  (solo per se stessi): una chiave permette a chi ha la privata di entrare **come quell'utente** dal front-end;
-- `~/.ssh/authorized_keys` (`-home`) si legge solo se e' un file dell'utente, non un collegamento;
-- togliere utenti e chiavi e' sempre possibile (non concede nulla).
+Ci sono due livelli di amministratori:
 
-Attenzione: un amministratore che aggiunge una chiave per un utente qualsiasi puo' poi entrare come lui dal front-end. Dai
-`admin_group` solo a chi puo' avere questa fiducia, oppure limita con **`admin_setup`** in `[global]`: `users keys`
-(predefinito), `users` (le chiavi restano di root), `keys`, `no`.
+- **`admin_root_groups`** (in `[global]`, per esempio un gruppo di FreeIPA/LDAP: `admin_root_groups = ipa-sysadmins`): i
+  membri amministrano ptscry **con l'autorita' di root**: tutte le operazioni `admin`, `admin reexec`, `admin setup`
+  senza limiti (anche `-create` e `-shell`) e decidono chi e' in `admin_group`. Nell'audit `root_authority: true`.
+- **`admin_group`** (es. `ptscry-admins` locale): gestiscono utenti e chiavi con questi limiti:
+  - niente account di sistema: `-create`/`-shell` no, e non si aggiungono utenti con UID sotto `UID_MIN`
+    (`/etc/login.defs`, di solito 1000) ne' root;
+  - non decidono chi amministra ptscry: niente `-admin`, e non tolgono un altro amministratore (di `admin_group` o di
+    `admin_root_groups`);
+  - `~/.ssh/authorized_keys` (`-home`) si legge solo se e' un file dell'utente, non un collegamento.
+
+Non ci sono altri controlli sui gruppi: come in Unix, chi e' in `sudo`, `wheel`, `docker` o in `admin_group` lo decide
+l'amministratore del sistema. Ne segue che una chiave permette a chi ha la privata di entrare **come quell'utente** dal
+front-end, chiunque sia: un membro di `admin_group` che aggiunge una chiave a un utente con sudo puo' diventare root
+attraverso di lui. Dai `admin_group` solo a chi puo' avere questa fiducia, oppure limita con **`admin_setup`** in
+`[global]`: `users keys` (predefinito), `users` (le chiavi restano di root e di `admin_root_groups`), `keys`, `no`.
 
 I gruppi locali si cambiano con `gpasswd`; se `access_group` viene da FreeIPA/SSSD il comando non lo tocca e dice il comando
 `ipa group-add-member` da usare. Le chiavi vanno in `frontend_authorized_keys_dir` (file root 0644, scrittura atomica):

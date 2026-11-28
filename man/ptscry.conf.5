@@ -87,10 +87,16 @@ chi puo' usare \fBptscry admin\fR. Root puo' sempre.
 .TP
 .B admin_setup = users keys\fR|\fBusers\fR|\fBkeys\fR|\fBno
 cosa possono cambiare i membri di admin_group con \fBptscry admin setup\fR (e dalla GUI) senza sudo: gli utenti di
-ptscry, le chiavi del front-end, entrambi (default) o niente. Mai account di sistema (UID sotto UID_MIN), root, chiavi
-per membri di root/sudo/wheel/admin/adm/docker/lxd/incus-admin/libvirt/disk/shadow, per chi ha diritti in sudoers
-(\fBsudo -l -U\fR) o per un altro amministratore. Una chiave permette di entrare come quell'utente:
-le operazioni sono registrate nell'audit (\fBadmin_setup\fR).
+ptscry, le chiavi del front-end, entrambi (default) o niente. Mai account di sistema (\fB\-create\fR, \fB\-shell\fR, UID
+sotto UID_MIN) ne' root, e non chi amministra ptscry (\fB\-admin\fR, togliere un amministratore): lo decidono root e
+admin_root_groups. Nessun altro controllo sui gruppi: chi e' in sudo, wheel, docker o admin_group lo decide
+l'amministratore del sistema, come in Unix. Una chiave permette di entrare come quell'utente, chiunque sia: le
+operazioni sono registrate nell'audit (\fBadmin_setup\fR).
+.TP
+.B admin_root_groups = \fIgruppo\fR ...
+gruppi (locali o da LDAP/FreeIPA, separati da spazi o virgole) i cui membri amministrano ptscry con l'autorita' di root:
+tutte le operazioni \fBadmin\fR, \fBadmin reexec\fR, \fBadmin setup\fR senza i limiti di admin_setup (anche
+\fB\-create\fR e \fB\-shell\fR) e i membri di admin_group. Solo in [global]; nell'audit \fBroot_authority\fR.
 .TP
 .B max_total_sessions = \fIN\fB|unlimited\fR
 tetto alle sessioni di tutti gli utenti insieme (default 1024). Gli pseudoterminali

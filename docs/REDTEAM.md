@@ -12,7 +12,7 @@ l'attacco fallisce). Gli attacchi di rete al front-end sono quelli di `tests/e2e
 | Attaccante | Cosa ha | Cosa vuole |
 |---|---|---|
 | A1 utente locale di ptscry | una shell, è in `access_group` | sessioni o dati di altri, root, nascondere ciò che fa (audit, registrazioni), bloccare il servizio |
-| A2 amministratore di ptscry | è in `admin_group`, niente sudo | diventare root o un altro amministratore |
+| A2 amministratore di ptscry | è in `admin_group`, niente sudo | creare account di sistema, toccare root, decidere chi amministra ptscry |
 | A3 rete | raggiunge la porta del front-end | entrare senza chiave/TOTP, scoprire utenti, inoltri, esaurire risorse |
 | A4 server ostile | un server a cui si collega la GUI/TUI | eseguire codice o leggere dati sul computer di chi si collega |
 
@@ -47,9 +47,9 @@ l'attacco fallisce). Gli attacchi di rete al front-end sono quelli di `tests/e2e
 | Attacco | Esito |
 |---|---|
 | `users add -create`, `-shell`, `root`, `daemon` (UID < UID_MIN), opzione dopo il nome | rifiutati |
-| chiavi per root, per membri di `sudo`, per un altro amministratore | rifiutate |
+| chiavi per root; `users add -admin` (anche dopo il nome o `--admin=true`); togliere un altro amministratore | rifiutati |
 | chiavi per `..`, `keys list ..`, file di chiave `/etc/shadow` | rifiutati (il file lo legge il client) |
-| **chiavi per un utente con `NOPASSWD: ALL` in `/etc/sudoers.d`** (non tramite gruppo) | **accettate prima della correzione** → R3 |
+| chiavi per un membro di `sudo` o per chi ha `NOPASSWD: ALL` in sudoers | accettate **per scelta di progetto** (R3) |
 
 ### 3.3 Rete (A3) — `tests/e2e_frontend.py`
 Respinti: codice TOTP sbagliato, riuso di un codice, 5 errori ⇒ blocco (anche con il codice giusto), utente senza
@@ -74,11 +74,11 @@ TOTP non è sfruttabile da chi non ha già la chiave: il TOTP è il secondo fatt
 |---|---|---|---|
 | R1 | Media (solo con `ptrace_scope = 0`) | tra l'exec dell'host e `prctl(PR_SET_DUMPABLE, 0)` (avvio del runtime Go) un processo dello stesso utente poteva agganciarlo con ptrace e falsare audit/registrazioni | costruttore ELF (`harden_cgo.go`) che rende host, launcher e monitor non ispezionabili prima del runtime; `ptscry check` continua a segnalare `ptrace_scope = 0` |
 | R2 | Bassa | gli invii del monitor a un host non avevano scadenza: un host fermato con SIGSTOP poteva tenere occupati goroutine di root (kill, revoca, spegnimento) | scadenza di 10 s su ogni invio al canale di controllo di un host |
-| R3 | Alta (per chi usa `admin_setup`) | un amministratore di ptscry poteva aggiungere una chiave per un utente con diritti sudo dati **per nome** in sudoers ed entrare come lui ⇒ root | rifiuto se `sudo -l -U` dà qualunque diritto (nel dubbio: rifiuto); gruppi esclusi estesi a docker, lxd, incus-admin, libvirt, disk, shadow |
+| R3 | Decisione di progetto | un membro di `admin_group` può aggiungere una chiave a un utente con diritti sudo (per gruppo o per nome in sudoers) ed entrare come lui ⇒ root. Un primo controllo (gruppi privilegiati, `sudo -l -U`) è stato tolto: aggiungeva una politica che Unix non ha | come in Unix, chi è in sudo/docker/`admin_group` lo decide l'amministratore del sistema; `admin_group` non può più decidere chi amministra ptscry (`-admin`, togliere amministratori): lo fanno root e i nuovi **`admin_root_groups`** (es. un gruppo FreeIPA), con l'autorità di root; `admin_setup = users` toglie le chiavi ad `admin_group` |
 | R4 | Bassa | il titolo impostato da un programma arrivava intero alla scheda e alla finestra (falsificazione con U+202E, lunghezza) | `cleanTitle`: niente controlli né caratteri di formato, massimo 128 byte |
 | R5 | Informativa | i nomi utente `.` e `..` erano validi (percorsi nella cartella delle chiavi; solo errori di lettura) | esclusi da `feUserRe` |
 
-Test di regressione: `tests/e2e_redteam.py` (R1, R2, R3, R5 e tutti gli attacchi del cap. 3.1–3.2),
+Test di regressione: `tests/e2e_redteam.py` (R1, R2, R3 nella forma decisa, R5 e tutti gli attacchi del cap. 3.1–3.2),
 `gui/review2_test.go:TestCleanTitleRedTeam` (R4).
 
 ## 5. Rischi che restano (per progetto)
@@ -86,9 +86,10 @@ Test di regressione: `tests/e2e_redteam.py` (R1, R2, R3, R5 e tutti gli attacchi
 - **L'utente controlla il proprio host**: può terminarlo o fermarlo (stesso uid). Le sue sessioni finiscono o si
   fermano con lui; l'audit degli eventi decisi dal monitor resta completo. Contro ptrace serve
   `kernel.yama.ptrace_scope >= 1` (consigliato in `ISO27001.md`).
-- **Chi è in `admin_group` può entrare come qualunque utente non privilegiato** aggiungendogli una chiave: è il potere
-  che `admin_setup = keys` concede; ogni operazione è nell'audit (`admin_setup` con le impronte). Chi non lo vuole usa
-  `admin_setup = users` o `no`.
+- **Chi è in `admin_group` può entrare come qualunque utente** (tranne root e gli account di sistema) aggiungendogli una
+  chiave, anche come chi ha sudo: è il potere che `admin_setup = keys` concede, e chi è in `admin_group` va scelto con la
+  stessa fiducia di chi è in sudo. Ogni operazione è nell'audit (`admin_setup` con le impronte). Chi non lo vuole usa
+  `admin_setup = users` (le chiavi restano a root e ad `admin_root_groups`) o `no`.
 - Il client a riga di comando (`ptscry attach`, `ptscry -H`) passa l'output della sessione al terminale locale come
   fa ssh: un server ostile può usare le funzioni del terminale locale (es. scrivere negli appunti con OSC 52, se il
   terminale lo consente). La GUI e la TUI non hanno questo problema (emulano).

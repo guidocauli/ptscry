@@ -160,6 +160,13 @@ func cmdCheck(args []string) error {
 			d.bad("A.8.2", fmt.Sprintf("admin_group %q does not exist", g.AdminGroup))
 		}
 	}
+	for _, rg := range g.AdminRootGroups {
+		if _, err := lookupGroup(rg); err != nil {
+			d.bad("A.8.2", fmt.Sprintf("admin_root_groups: group %q does not exist", rg))
+		} else {
+			d.info(fmt.Sprintf("admin_root_groups: the members of %q administer ptscry with root's authority (A.8.2)", rg))
+		}
+	}
 	if g.MaxSessions == 0 {
 		d.warnf("A.8.6", "max_sessions is unlimited by default: consider a global cap and unlimited only for selected groups")
 	}

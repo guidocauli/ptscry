@@ -60,6 +60,11 @@ func buildFeInit(g config) (*feInit, *identity, error) {
 	if g.AdminGroup != "" && contains(id.groups, g.AdminGroup) {
 		return nil, nil, fmt.Errorf("frontend_user %s must not be a member of admin_group %s", id.u.Username, g.AdminGroup)
 	}
+	for _, rg := range g.AdminRootGroups {
+		if contains(id.groups, rg) {
+			return nil, nil, fmt.Errorf("frontend_user %s must not be a member of admin_root_groups %s", id.u.Username, rg)
+		}
+	}
 	in := &feInit{
 		Listen: g.FrontendListen, KeysEnabled: g.FrontendKeysDir != "none", FIDO2: g.FrontendFIDO2,
 		TOTP: g.FrontendTOTP, CertMaxSeconds: int64(g.FrontendCertMax / time.Second),

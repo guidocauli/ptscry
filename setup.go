@@ -203,7 +203,11 @@ func usersList(w io.Writer, g config) error {
 		src = "directory (FreeIPA/SSSD)"
 	}
 	if g.AccessGroup != "" {
-		fmt.Fprintf(w, "access_group %s (%s), admin_group %s; root allowed: %v\n\n", g.AccessGroup, src, g.AdminGroup, g.AllowRoot)
+		fmt.Fprintf(w, "access_group %s (%s), admin_group %s; root allowed: %v\n", g.AccessGroup, src, g.AdminGroup, g.AllowRoot)
+		if len(g.AdminRootGroups) > 0 {
+			fmt.Fprintf(w, "admin_root_groups (root's authority on ptscry): %s\n", strings.Join(g.AdminRootGroups, " "))
+		}
+		fmt.Fprintln(w)
 	}
 	fmt.Fprintf(w, "%-20s %-7s %-6s %-5s %s\n", "USER", "UID", "ADMIN", "KEYS", "NOTE")
 	for _, u := range names {
@@ -920,15 +924,18 @@ func (wz *wizard) addKey(name string) {
 	}
 }
 
-// adminSetupAllowed: what a member of admin_group (not root) may change.
+// adminSetupAllowed: what a member of admin_group (not root, not in
+// admin_root_groups) may change.
 //   - only the parts admin_setup allows (default "users keys"; "no" = none);
-//   - never system accounts (uid below UID_MIN) nor root;
-//   - no keys for another administrator: a key lets its holder log in as that
-//     user through the front-end, so planting one for a peer would be a way to
-//     become them. Removing keys and users is always possible (it grants nothing).
+//   - no system accounts: -create/-shell, uid below UID_MIN, root;
+//   - not the membership of admin_group (-admin, or removing an
+//     administrator): who administers ptscry is decided by root or by
+//     admin_root_groups.
 //
-// Giving a key to an ordinary user still lets the administrator log in as that
-// user: admin_group is for people trusted with that (MANUALE.md, admin setup).
+// Nothing else is checked: like in Unix, who is in sudo, wheel, docker or in
+// admin_group is the system administrators' responsibility. A key for a user
+// lets its holder log in as that user through the front-end (MANUALE.md,
+// admin setup); every operation is in the audit (admin_setup).
 func adminSetupAllowed(g config, args []string, caller string) error {
 	part := args[0]
 	if part == "user" {
@@ -952,6 +959,9 @@ func adminSetupAllowed(g config, args []string, caller string) error {
 		if part == "users" && (a == "-create" || a == "--create" || strings.HasPrefix(a, "-shell") || strings.HasPrefix(a, "--shell")) {
 			return errors.New("creating system accounts needs root (sudo ptscry setup users add -create ...): an administrator of ptscry can only add existing users")
 		}
+		if part == "users" && (a == "-admin" || a == "--admin" || strings.HasPrefix(a, "-admin=") || strings.HasPrefix(a, "--admin=")) {
+			return errors.New("who administers ptscry is decided by root or by the members of admin_root_groups")
+		}
 	}
 	var targets []string
 	switch {
@@ -965,6 +975,7 @@ func adminSetupAllowed(g config, args []string, caller string) error {
 		targets = []string{args[2]}
 	}
 	adding := verb == "add" || verb == "import"
+	removingUser := part == "users" && !adding
 	for _, t := range targets {
 		if t == "root" {
 			return errors.New("root is not changed by an administrator")
@@ -983,66 +994,30 @@ func adminSetupAllowed(g config, args []string, caller string) error {
 		if adding && uid < uidMin() {
 			return fmt.Errorf("%s is a system account (uid %d below UID_MIN %d): only root adds it (sudo ptscry setup ...)", t, uid, uidMin())
 		}
-		if part == "keys" && adding {
-			// a key for someone who can become root (sudo, wheel...) would be a
-			// way to become root: those stay root's to give
-			if id, err := lookupIdentityByName(t); err == nil {
-				for _, pg := range privilegedGroups {
-					if contains(id.groups, pg) {
-						return fmt.Errorf("%s is in the group %s (system administration): only root adds keys for them", t, pg)
-					}
-				}
-			}
-			// sudo rights given by name in sudoers (not through a group)
-			if sudoRights(t) {
-				return fmt.Errorf("%s may use sudo (sudoers): only root adds keys for them", t)
-			}
-		}
-		if part == "keys" && adding && t != caller && g.AdminGroup != "" {
-			if members, _, err := groupMembers(g.AdminGroup); err == nil && contains(members, t) {
-				return fmt.Errorf("%s is an administrator too: only root (or %s themselves) adds keys for them", t, t)
-			}
-			if id, err := lookupIdentityByName(t); err == nil && contains(id.groups, g.AdminGroup) {
-				return fmt.Errorf("%s is an administrator too: only root (or %s themselves) adds keys for them", t, t)
-			}
+		if removingUser && isPtscryAdmin(g, t) {
+			// "users remove" takes them out of admin_group too
+			return fmt.Errorf("%s is an administrator of ptscry: only root or admin_root_groups remove them", t)
 		}
 	}
 	return nil
 }
 
-// privilegedGroups are the usual groups of those who may become root, or who
-// can read or change what root owns (containers, disks, the password hashes).
-var privilegedGroups = []string{"root", "sudo", "wheel", "admin", "adm",
-	"docker", "lxd", "incus-admin", "libvirt", "disk", "shadow"}
-
-// sudoRights says whether sudoers gives the user anything at all ("sudo -l -U",
-// run by root). An error that is not "unknown user" counts as yes: when in
-// doubt the key stays root's to add.
-var sudoRights = func(name string) bool {
-	path, err := exec.LookPath("sudo")
-	if err != nil {
-		for _, p := range []string{"/usr/bin/sudo", "/bin/sudo"} {
-			if _, e := os.Stat(p); e == nil {
-				path = p
-			}
+// isPtscryAdmin: the user is in admin_group or in one of admin_root_groups.
+func isPtscryAdmin(g config, name string) bool {
+	groups := append([]string{g.AdminGroup}, g.AdminRootGroups...)
+	id, idErr := lookupIdentityByName(name)
+	for _, grp := range groups {
+		if grp == "" {
+			continue
 		}
-		if path == "" {
-			return false // no sudo on this system
+		if members, _, err := groupMembers(grp); err == nil && contains(members, name) {
+			return true
+		}
+		if idErr == nil && contains(id.groups, grp) {
+			return true
 		}
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, path, "-n", "-l", "-U", name)
-	cmd.Env = []string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL=C"}
-	out, err := cmd.CombinedOutput()
-	o := string(out)
-	if strings.Contains(o, "is not allowed to run sudo") {
-		return false
-	}
-	if err != nil && strings.Contains(o, "unknown user") {
-		return false
-	}
-	return true
+	return false
 }
 
 // uidMin is UID_MIN of /etc/login.defs (1000 if missing): below are system accounts.

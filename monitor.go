@@ -78,6 +78,12 @@ type mhost struct {
 	recs     map[string]*recorder
 	exited   chan struct{}
 
+	// handMu orders the hand-offs with the host's goodbye: once gone is set
+	// (ctlBye) no client is sent to this host any more, so none is lost in
+	// the socket of a host that is ending.
+	handMu sync.Mutex
+	gone   bool
+
 	frozen   atomic.Bool   // control channel paused for a monitor re-exec
 	paused   atomic.Bool   // ... and confirmed stopped
 	loopDone chan struct{} // closed when the reader loop returns
@@ -435,7 +441,7 @@ func cmdMonitor(args []string) error {
 
 	m.audit.log("monitor_start", fields{"pid": os.Getpid(), "version": progVersion, "resumed": resumed != nil,
 		"config": *cpath, "socket": sock, "yama_ptrace_scope": readTrim("/proc/sys/kernel/yama/ptrace_scope"),
-		"access_group": m.global.AccessGroup, "admin_group": m.global.AdminGroup, "allow_root": m.global.AllowRoot,
+		"access_group": m.global.AccessGroup, "admin_group": m.global.AdminGroup, "admin_root_groups": strings.Join(m.global.AdminRootGroups, " "), "allow_root": m.global.AllowRoot,
 		"pam_service": m.global.PAMService, "frontend": m.global.Frontend})
 
 	if resumed != nil {
@@ -985,7 +991,28 @@ func (mh *mhost) handoff(uc *net.UnixConn, hl *hello, cred *syscall.Ucred, req u
 		return err
 	}
 	defer f.Close()
+	mh.handMu.Lock()
+	defer mh.handMu.Unlock()
+	if mh.gone {
+		return errors.New("host ending")
+	}
 	return mh.ctl.sendFD(ctlClient, b, f)
+}
+
+// onBye: the host is ending (no sessions left). From now on requests start a
+// new host; the clients already sent arrive before the acknowledgement, and
+// the host answers them ("host is shutting down": the client retries).
+func (mh *mhost) onBye() {
+	mh.handMu.Lock()
+	defer mh.handMu.Unlock()
+	mh.gone = true
+	m := mh.m
+	m.mu.Lock()
+	if m.hosts[mh.uid] == mh {
+		delete(m.hosts, mh.uid)
+	}
+	m.mu.Unlock()
+	_ = mh.ctl.send(ctlByeAck, nil)
 }
 
 // ------------------------------------------------------------------ hosts
@@ -1195,6 +1222,8 @@ func (mh *mhost) readLoop() {
 				return
 			}
 			mh.onKillSess(p)
+		case ctlBye:
+			mh.onBye()
 		}
 	}
 }
@@ -1415,10 +1444,14 @@ func (m *monitor) handleAdmin(fc *framed, hl *hello, cred *syscall.Ucred, req ui
 	uid := int(cred.Uid)
 	_, global := m.snapshot()
 	allowed, who := uid == 0, "root"
-	if !allowed && global.AdminGroup != "" {
+	rootLike := allowed // root, or a member of admin_root_groups
+	if !allowed {
 		if id, err := lookupIdentity(uid); err == nil {
 			who = id.u.Username
-			allowed = contains(id.groups, global.AdminGroup)
+			for _, g := range global.AdminRootGroups {
+				rootLike = rootLike || contains(id.groups, g)
+			}
+			allowed = rootLike || (global.AdminGroup != "" && contains(id.groups, global.AdminGroup))
 		}
 	}
 	if !allowed {
@@ -1448,9 +1481,9 @@ func (m *monitor) handleAdmin(fc *framed, hl *hello, cred *syscall.Ucred, req ui
 		// who may use ptscry and the front-end keys, for the administrators
 		// too (not only with sudo): done by this root process, one at a time
 		m.setupMu.Lock()
-		out, err := runSetupForAdmin(m.cfgPath, hl.Cmd, hl.Text, setupCaller{root: uid == 0, name: who})
+		out, err := runSetupForAdmin(m.cfgPath, hl.Cmd, hl.Text, setupCaller{root: rootLike, name: who})
 		m.setupMu.Unlock()
-		f := fields{"req": req, "admin_uid": uid, "admin": who, "args": clip(strings.Join(hl.Cmd, " "), 512), "ok": err == nil}
+		f := fields{"req": req, "admin_uid": uid, "admin": who, "root_authority": rootLike, "args": clip(strings.Join(hl.Cmd, " "), 512), "ok": err == nil}
 		if len(hl.Cmd) > 1 && hl.Cmd[0] == "keys" && hl.Cmd[1] != "list" && hl.Cmd[1] != "ls" {
 			f["result"] = clip(out, 1024) // the fingerprints added or removed
 		}
@@ -1465,8 +1498,8 @@ func (m *monitor) handleAdmin(fc *framed, hl *hello, cred *syscall.Ucred, req ui
 		_ = replyOK(fc, okReply{Message: "done", Text: out})
 
 	case "admin-reexec":
-		if uid != 0 {
-			m.deny(fc, req, uid, who, "only root may re-exec the monitor", "")
+		if !rootLike {
+			m.deny(fc, req, uid, who, "only root (or admin_root_groups) may re-exec the monitor", "")
 			return
 		}
 		m.audit.log("admin_reexec", fields{"req": req, "admin_uid": uid, "admin": who})

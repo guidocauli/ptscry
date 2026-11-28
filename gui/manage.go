@@ -184,7 +184,7 @@ func fixedArgs(args ...string) func(d *manageDialog) ([]string, error) {
 var mgPages = []struct{ key, label, about string }{
 	{"sess", "Sessioni e job", "Le sessioni del server scelto: scegline una dall'elenco per agire su di lei, oppure creane una nuova o lancia un job."},
 	{"host", "Host", "Il processo che tiene le tue sessioni su questo computer: avvio, configurazione, verifiche, arresto."},
-	{"admin", "Amministrazione", "Solo con il monitor di questo computer, come root o membro di admin_group: tutti gli utenti, audit, TOTP."},
+	{"admin", "Amministrazione", "Solo con il monitor di questo computer, come root, membro di admin_root_groups o di admin_group: tutti gli utenti, audit, TOTP."},
 	{"svc", "Servizio", "Il servizio systemd ptscry-monitor di questo computer (senza root la conferma la chiede pkexec)."},
 }
 
@@ -233,8 +233,8 @@ var mgActions = []mgAction{
 	// root monitor for root and the members of admin_group (no sudo)
 	{page: "admin", section: "Utenti di ptscry", label: "Elenco degli utenti", about: "i membri del gruppo di accesso e di quello degli amministratori", cap: capAdmin, args: fixedArgs("admin", "setup", "users", "list")},
 	{page: "admin", section: "Utenti di ptscry", label: "Aggiungi l'utente", about: "l'utente scritto sopra entra nel gruppo di accesso (l'account deve esistere)", cap: capAdmin, args: userArgs("users", "add")},
-	{page: "admin", section: "Utenti di ptscry", label: "Aggiungi come amministratore", about: "nel gruppo di accesso e in quello degli amministratori", cap: capAdmin, args: userArgs("users", "add", "-admin")},
-	{page: "admin", section: "Utenti di ptscry", label: "Togli da amministratore", about: "resta utente, non più amministratore", cap: capAdmin, danger: true, args: userArgs("users", "remove", "-admin")},
+	{page: "admin", section: "Utenti di ptscry", label: "Aggiungi come amministratore", about: "nel gruppo di accesso e in quello degli amministratori (root o admin_root_groups)", cap: capAdmin, args: userArgs("users", "add", "-admin")},
+	{page: "admin", section: "Utenti di ptscry", label: "Togli da amministratore", about: "resta utente, non più amministratore (root o admin_root_groups)", cap: capAdmin, danger: true, args: userArgs("users", "remove", "-admin")},
 	{page: "admin", section: "Utenti di ptscry", label: "Togli l'utente", about: "non può più usare ptscry; le sue sessioni si chiudono al prossimo controllo", cap: capAdmin, danger: true, args: userArgs("users", "remove")},
 	{page: "admin", section: "Chiavi del front-end SSH", label: "Elenco delle chiavi", about: "dell'utente scritto sopra, o di tutti se è vuoto", cap: capAdmin, args: func(d *manageDialog) ([]string, error) {
 		a := []string{"admin", "setup", "keys", "list"}

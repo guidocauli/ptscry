@@ -65,7 +65,9 @@ func (p peerInfo) fields(extra fields) fields {
 }
 
 type host struct {
-	active   atomic.Int32 // client connections being served
+	active   atomic.Int32  // client connections being served
+	byeAck   chan struct{} // managed: the monitor acknowledged ctlBye
+	byeOnce  sync.Once
 	cfg      config
 	uid      int
 	username string

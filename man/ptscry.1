@@ -151,7 +151,7 @@ salvata (sequenza OSC 7799 nell'output).
 .TP
 .B config
 Mostra la configurazione effettiva per l'utente (limiti, ciclo di vita, registrazione).
-.SS Amministrazione (root o membri di admin_group)
+.SS Amministrazione (root, admin_root_groups o membri di admin_group)
 .TP
 .B admin list
 Tutte le sessioni di tutti gli utenti (non il contenuto).
@@ -163,12 +163,12 @@ Chiude una sessione di un utente.
 Chiude tutte le sessioni di un utente. Le azioni admin sono auditate con l'identita' dell'amministratore.
 .TP
 .B admin reexec
-Solo root. Sostituisce sul posto il binario del monitor (stesso pid, sessioni e connessioni SSH del front-end intatte); equivale a SIGUSR2. Prima verifica il nuovo binario con \fBmonitor \-t\fR; se fallisce non cambia nulla. Esito nell'audit (\fBmonitor_resumed\fR o \fBmonitor_reexec_failed\fR).
+Solo root o admin_root_groups. Sostituisce sul posto il binario del monitor (stesso pid, sessioni e connessioni SSH del front-end intatte); equivale a SIGUSR2. Prima verifica il nuovo binario con \fBmonitor \-t\fR; se fallisce non cambia nulla. Esito nell'audit (\fBmonitor_resumed\fR o \fBmonitor_reexec_failed\fR).
 .TP
 .B admin setup users \fR...\fB | keys \fR...
 Come \fBsetup users\fR e \fBsetup keys\fR, senza sudo per i membri di admin_group: le esegue il monitor, con i limiti di
-\fBadmin_setup\fR (ptscry.conf(5)): niente account di sistema ne' root, niente chiavi per chi puo' diventare root o per un
-altro amministratore. Il file di una chiave lo legge il client. Ogni operazione e' nell'audit (\fBadmin_setup\fR).
+\fBadmin_setup\fR (ptscry.conf(5)): niente account di sistema ne' root, e la scelta degli amministratori resta a root e
+ad admin_root_groups (che non hanno limiti). Il file di una chiave lo legge il client. Ogni operazione e' nell'audit (\fBadmin_setup\fR).
 .TP
 .B audit\-verify [\fIfile\fR...]
 Verifica numero di sequenza e catena di hash dell'audit. Piu' file, nell'ordine

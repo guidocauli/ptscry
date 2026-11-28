@@ -42,6 +42,12 @@ func TestRunSetupForAdmin(t *testing.T) {
 			t.Errorf("%v by an administrator was accepted", args)
 		}
 	}
+	// the membership of admin_group: root or admin_root_groups only
+	for _, args := range [][]string{{"users", "add", "-admin", "nobody"}, {"users", "add", "--admin=true", "nobody"}, {"users", "remove", "-admin", "nobody"}} {
+		if _, err := runSetupForAdmin(conf, args, "", adm); err == nil || !strings.Contains(err.Error(), "admin_root_groups") {
+			t.Errorf("%v by an administrator: %v", args, err)
+		}
+	}
 	// admin_setup = users: no keys
 	if err := os.WriteFile(conf, []byte("[global]\nadmin_setup = users\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -54,5 +60,26 @@ func TestRunSetupForAdmin(t *testing.T) {
 	}
 	if _, err := runSetupForAdmin(conf, []string{"users", "list"}, "", adm); err == nil {
 		t.Error("an invalid admin_setup was accepted")
+	}
+}
+
+func TestAdminRootGroupsConfig(t *testing.T) {
+	d := t.TempDir()
+	conf := filepath.Join(d, "ptscry.conf")
+	if err := os.WriteFile(conf, []byte("[global]\nadmin_root_groups = ldap-sysadmins, ipa-admins root\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	g, err := setupConfigAt(conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(g.AdminRootGroups, " ") != "ldap-sysadmins ipa-admins" {
+		t.Errorf("admin_root_groups = %q", g.AdminRootGroups)
+	}
+	if err := os.WriteFile(conf, []byte("[global]\n[user:x]\nadmin_root_groups = g\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := setupConfigAt(conf); err == nil {
+		t.Error("admin_root_groups accepted outside [global]")
 	}
 }

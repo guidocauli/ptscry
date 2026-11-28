@@ -59,6 +59,11 @@ type config struct {
 	AllowRoot     bool   // root may use ptscry locally without being in AccessGroup (allow_root, default yes)
 	AdminGroup    string // members may use "admin" operations (root always may)
 	AdminSetup    string // what admin_group may change through the monitor: "users keys" (default), "users", "keys", "no"
+	// AdminRootGroups: groups (local or from LDAP/FreeIPA) whose members are
+	// administrators of ptscry with root's authority: every admin operation,
+	// admin setup without limits, the membership of admin_group. Set by root
+	// in the global configuration only.
+	AdminRootGroups []string
 	// MaxTotalSessions caps the sessions of all users together (0 = unlimited):
 	// pseudoterminals are a system-wide resource (kernel.pty.max).
 	MaxTotalSessions int
@@ -123,7 +128,7 @@ const defaultMonitorSocket = "/run/ptscry/monitor.sock"
 
 var globalOnly = map[string]bool{
 	"socket_dir": true, "audit_log": true, "audit_syslog": true, "audit_group": true, "record_dir": true,
-	"monitor_socket": true, "access_group": true, "admin_group": true, "admin_setup": true, "allow_root": true,
+	"monitor_socket": true, "access_group": true, "admin_group": true, "admin_setup": true, "admin_root_groups": true, "allow_root": true,
 	"max_total_sessions": true, "pam_service": true,
 	"frontend": true, "frontend_listen": true, "frontend_user": true, "frontend_host_key": true,
 	"frontend_ca_keys": true, "frontend_authorized_keys_dir": true, "frontend_require_fido2": true,
@@ -333,6 +338,14 @@ func (c *config) set(key, val string, scoped bool) error {
 		c.AllowRoot = b
 	case "admin_group":
 		c.AdminGroup = val
+	case "admin_root_groups":
+		c.AdminRootGroups = nil
+		for _, g := range strings.FieldsFunc(val, func(r rune) bool { return r == ' ' || r == ',' || r == '\t' }) {
+			if g == "root" || g == "none" || g == "-" {
+				continue
+			}
+			c.AdminRootGroups = append(c.AdminRootGroups, g)
+		}
 	case "replay_bytes":
 		n, err := strconv.Atoi(val)
 		if err != nil || n < 0 || n > 512*1024 {
